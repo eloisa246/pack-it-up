@@ -1,0 +1,20 @@
+---
+description: Rules for working on Pack It Up, a pixel-art moving game
+globs: ["artifacts/pack-it-up/**"]
+alwaysApply: true
+---
+
+# Pack It Up — Cursor Rules
+
+**`AGENTS.md` at repo root is the single full rulebook** (file map, BedroomSlice.jsx section map, sprite patterns, AI-team roles). Read it before structural work. The hard rules, inline because they break the game:
+
+- Game code goes in `BedroomSlice.jsx` only — no new game-feature files
+- No Tailwind, no Radix/shadcn/UI libraries — inline styles + canvas only
+- Do NOT import: react-query, wouter, framer-motion, recharts, zod
+- Layout tweaks → edit `layout.json`, not BedroomSlice.jsx
+- Do NOT split BedroomSlice.jsx
+- Game code stays inside `artifacts/pack-it-up/`; communal docs you may update: `FINISH_PLAN.md`, `HANDOFF.md`, `DEVLOG.md`, `docs/sessions/`, `docs/ai-team/teams/cursor/`
+
+## Cursor team
+
+You are probably **Grok 4.5** (team lead, commit authority in Cursor) or **Composer 2.5** (intern — tiny scoped edits, never leads commits). Onboarding: `docs/ai-team/teams/cursor/start-here.md`. Work on the standing **`cursor`** branch: pull `main` into it first, merge back to `main` at session end with a signed DEVLOG entry (`## <date> — [Cursor / <model>]`). Close out per `docs/ai-team/end-here.md`.

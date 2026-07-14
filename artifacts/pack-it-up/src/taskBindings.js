@@ -1,0 +1,247 @@
+import { INVENTORY_COLLECTION_OPTIONS, INVENTORY_ITEM_OPTIONS, inventoryTargetKeys } from "./inventoryCollections.js";
+import { PACKABLE_APARTMENT_TARGET_OPTIONS } from "./apartmentObjectCatalog.js";
+
+/* Canonical links between Ledger tasks and gameplay state. Static binding
+   definitions stay in code/tasks; saves persist only the chosen binding and
+   the resulting world/task state. */
+
+export const GAME_FEATURE_OPTIONS = [
+  { value: "packing_requirement", label: "Packing requirements (mixed)" },
+  { value: "apartment_item", label: "Apartment item / packing" },
+  { value: "inventory_collection", label: "Stored item collection" },
+  { value: "inventory_item", label: "Individual stored item" },
+  { value: "health_zone", label: "Health body zone" },
+  { value: "health_appointment", label: "Health appointment" },
+];
+
+const HEALTH_TARGETS = [
+  ["brain", "Psychiatry / medication"], ["teeth", "Dentist"],
+  ["heart", "Cardiology"], ["skin", "Dermatology"],
+  ["lymph", "Rheumatology / labs"], ["obgyn", "OB/GYN"],
+].map(([value, label]) => ({ value, label }));
+
+// Stable room:item IDs. A custom value remains valid even when it is not in
+// this convenience list, so future objects do not require a schema change.
+export const ITEM_TARGET_OPTIONS = [
+  ["bedroom:nightstand", "Bedroom · Nightstand"],
+  ["bedroom:dresser", "Bedroom · Dresser"],
+  ["bedroom:closet_door", "Bedroom · Closet"],
+  ["bedroom:bed_frame", "Bedroom · Bed frame"],
+  ["bedroom:mattress", "Bedroom · Mattress"],
+  ["office:desk_hutch", "Office · Desk & hutch"],
+  ["office:office_chair", "Office · Chair"],
+  ["office:wifi_router", "Office · Wi-Fi router"],
+  ["dining:dining_table", "Dining · Table"],
+  ["dining:dining_chairs", "Dining · Chair set"],
+  ["living:tv_hutch", "Living · TV hutch"],
+  ["living:coffee_table", "Living · Coffee table"],
+  ["living:sofa", "Living · Sofa"],
+].map(([value, label]) => ({ value, label }));
+
+export const COMPLETION_TRIGGER_OPTIONS = {
+  manual: [{ value: "confirmed", label: "Player confirms it" }],
+  apartment_item: [
+    { value: "handled", label: "Packed, sold, or donated" },
+    { value: "packed", label: "Packed" },
+    { value: "sold", label: "Sold" },
+    { value: "donated", label: "Donated" },
+    { value: "buyerFound", label: "Buyer found" },
+    { value: "removed", label: "Sold or donated (physically removed)" },
+  ],
+  packing_requirement: [
+    { value: "packed", label: "Everything packed" },
+    { value: "handled", label: "Everything packed, sold, or donated" },
+  ],
+  inventory_collection: [
+    { value: "packed", label: "Every item packed" },
+    { value: "handled", label: "Every item packed, sold, or donated" },
+  ],
+  inventory_item: [
+    { value: "packed", label: "Packed" },
+    { value: "handled", label: "Packed, sold, or donated" },
+    { value: "sold", label: "Sold" },
+    { value: "donated", label: "Donated" },
+  ],
+  health_zone: [{ value: "stabilized", label: "Zone stabilized" }],
+  health_appointment: [
+    { value: "booked", label: "Appointment booked" },
+    { value: "attended", label: "Appointment attended" },
+  ],
+};
+
+export const TASK_RESULT_OPTIONS = [
+  { value: "done", label: "Mark task done" },
+  { value: "pending", label: "Reopen task" },
+  { value: "dismissed", label: "Dismiss task" },
+  { value: "archived", label: "Archive task" },
+];
+
+export function targetOptionsForFeature(feature) {
+  if (feature === "packing_requirement") return [
+    ...PACKABLE_APARTMENT_TARGET_OPTIONS.map((option) => ({ value: `object:${option.value}`, label: `Environment · ${option.label}` })),
+    ...INVENTORY_COLLECTION_OPTIONS.map((option) => ({ ...option, label: `Collection · ${option.label}` })),
+    ...INVENTORY_ITEM_OPTIONS.map((option) => ({ value: `item:${option.value}`, label: `Stored item · ${option.label}` })),
+  ];
+  if (feature === "apartment_item") return PACKABLE_APARTMENT_TARGET_OPTIONS;
+  if (feature === "inventory_collection") return INVENTORY_COLLECTION_OPTIONS;
+  if (feature === "inventory_item") return INVENTORY_ITEM_OPTIONS;
+  if (feature === "health_zone" || feature === "health_appointment") return HEALTH_TARGETS;
+  return [];
+}
+
+export function normalizeTaskBinding(binding) {
+  if (!binding || typeof binding !== "object" || !binding.feature) return null;
+  const feature = String(binding.feature);
+  const validFeature = GAME_FEATURE_OPTIONS.some((option) => option.value === feature);
+  if (!validFeature) return null;
+  const triggers = COMPLETION_TRIGGER_OPTIONS[feature] || [];
+  const trigger = triggers.some((option) => option.value === binding.trigger)
+    ? binding.trigger
+    : triggers[0]?.value;
+  const targets = Array.isArray(binding.targets)
+    ? binding.targets.map((target) => String(target || "").trim()).filter(Boolean)
+    : [];
+  const rawTarget = String(binding.target || targets[0] || "").trim();
+  const target = rawTarget.startsWith("custom:") ? rawTarget.slice("custom:".length).trim() : rawTarget;
+  if (!trigger || !target) return null;
+  const resultStatus = TASK_RESULT_OPTIONS.some((option) => option.value === binding.resultStatus)
+    ? binding.resultStatus
+    : "done";
+  return {
+    feature,
+    target,
+    ...(targets.length > 1 ? { targets: [...new Set(targets)], aggregate: binding.aggregate === "any" ? "any" : "all" } : {}),
+    trigger,
+    resultStatus,
+  };
+}
+
+export function resolveTaskDestination(task) {
+  const binding = normalizeTaskBinding(task?.binding);
+  if (binding?.feature === "apartment_item") {
+    const [roomId, objectId] = binding.target.split(":");
+    return { screen: "apartment", roomId, objectId };
+  }
+  if (binding?.feature === "packing_requirement") {
+    const first = binding.target;
+    const raw = first.startsWith("object:")
+      ? first.slice("object:".length)
+      : first.startsWith("item:")
+        ? first.slice("item:".length)
+        : inventoryTargetKeys("inventory_collection", first)[0]?.replace(/^object:/, "");
+    const [roomId, objectId] = String(raw || "").split(":");
+    return roomId && objectId ? { screen: "apartment", roomId, objectId } : null;
+  }
+  if (binding?.feature === "inventory_collection" || binding?.feature === "inventory_item") {
+    const raw = binding.feature === "inventory_collection"
+      ? inventoryTargetKeys(binding.feature, binding.target)[0]
+      : binding.target;
+    const [roomId, objectId] = String(raw || "").split(":");
+    return roomId && objectId ? { screen: "apartment", roomId, objectId } : null;
+  }
+  if (binding?.feature === "health_zone" || binding?.feature === "health_appointment") {
+    return { screen: "health", zone: binding.target };
+  }
+  return null;
+}
+
+export function bindingMatchesEvent(bindingLike, event) {
+  const binding = normalizeTaskBinding(bindingLike);
+  if (!binding || !event) return false;
+  const targets = binding.targets || [binding.target];
+  if (binding.feature !== event.feature || !targets.includes(event.target)) return false;
+  if (binding.trigger === event.trigger) return true;
+  if (binding.trigger === "handled") return ["packed", "sold", "donated"].includes(event.trigger);
+  return binding.trigger === "removed" && ["sold", "donated"].includes(event.trigger);
+}
+
+export function completeTaskFromEvent(tasks, event) {
+  return (tasks || []).map((task) => {
+    if (["dismissed", "archived"].includes(task.status)) return task;
+    const binding = normalizeTaskBinding(task.binding);
+    return bindingMatchesEvent(binding, event)
+      ? { ...task, status: binding.resultStatus }
+      : task;
+  });
+}
+
+export function taskBindingSatisfied(task, world = {}) {
+  const binding = normalizeTaskBinding(task?.binding);
+  if (!binding) return null;
+  if (binding.feature === "apartment_item") {
+    const targets = binding.targets || [binding.target];
+    const checks = targets.map((target) => {
+      const flags = world.objState?.[target];
+      if (!flags) return false;
+      if (binding.trigger === "handled") return !!(flags.packed || flags.sold || flags.donated);
+      if (binding.trigger === "removed") return !!(flags.sold || flags.donated);
+      return !!flags[binding.trigger];
+    });
+    return binding.aggregate === "any" ? checks.some(Boolean) : checks.every(Boolean);
+  }
+  if (binding.feature === "packing_requirement") {
+    const targets = binding.targets || [binding.target];
+    const checks = targets.map((target) => {
+      const keys = target.startsWith("object:")
+        ? [target]
+        : target.startsWith("item:")
+          ? [target.slice("item:".length)]
+          : inventoryTargetKeys("inventory_collection", target);
+      if (!keys.length) return false;
+      return keys.every((key) => {
+        const isObject = key.startsWith("object:");
+        const stateKey = isObject ? key.slice("object:".length) : key;
+        const flags = isObject ? world.objState?.[stateKey] : world.contentsState?.[stateKey];
+        if (!flags) return false;
+        if (binding.trigger === "handled") return !!(flags.packed || flags.sold || flags.donated);
+        return !!flags.packed;
+      });
+    });
+    return binding.aggregate === "any" ? checks.some(Boolean) : checks.every(Boolean);
+  }
+  if (binding.feature === "inventory_collection" || binding.feature === "inventory_item") {
+    const targets = binding.targets || [binding.target];
+    const checks = targets.map((target) => {
+      const keys = inventoryTargetKeys(binding.feature, target);
+      if (!keys.length) return false;
+      return keys.every((key) => {
+        const isObject = key.startsWith("object:");
+        const stateKey = isObject ? key.slice("object:".length) : key;
+        const flags = isObject ? world.objState?.[stateKey] : world.contentsState?.[stateKey];
+        if (!flags) return false;
+        if (binding.trigger === "handled") return !!(flags.packed || flags.sold || flags.donated);
+        return !!flags[binding.trigger];
+      });
+    });
+    return binding.aggregate === "any" ? checks.some(Boolean) : checks.every(Boolean);
+  }
+  if (binding.feature === "health_zone") {
+    return binding.trigger === "stabilized" && !!world.calmedZones?.[binding.target];
+  }
+  if (binding.feature === "health_appointment") {
+    const matches = (world.appointments || []).filter((appt) => appt.zone === binding.target && appt.status !== "cancelled");
+    return binding.trigger === "attended"
+      ? matches.some((appt) => appt.status === "attended")
+      : matches.length > 0;
+  }
+  return null;
+}
+
+export function reconcileTasksFromWorldState(tasks, world) {
+  return (tasks || []).map((task) => {
+    if (["dismissed", "archived"].includes(task.status)) return task;
+    const binding = normalizeTaskBinding(task.binding);
+    if (!binding) return task;
+    const satisfied = taskBindingSatisfied(task, world);
+    if (satisfied === true) return { ...task, status: binding.resultStatus };
+    // State-bound "done" tasks reopen when an undo restores the world.
+    if (satisfied === false && task.completionMode === "world" && binding.resultStatus === "done" && task.status === "done") {
+      return { ...task, status: "pending" };
+    }
+    return task;
+  });
+}
+
+export function isWorldBoundTask(task) {
+  return !!normalizeTaskBinding(task?.binding);
+}
