@@ -163,7 +163,7 @@ energy gate.
 So the build is: compute the pace hand → show it immediately → keep put-back and
 draw exactly as they already work.
 
-**Two small rulings that follow:**
+**Two small rulings that follow — both confirmed by Eloisa, Jul 25:**
 
 1. **A put-back sticks for the day, not forever.** Already the behavior. Tomorrow
    deals fresh, and if the card still matters it comes back — that's the app
