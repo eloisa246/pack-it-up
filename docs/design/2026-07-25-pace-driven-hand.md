@@ -10,6 +10,22 @@ the mechanic Eloisa actually asked for.
 > tasks that make sense for that day and the number of effort points required to
 > keep the move moving at pace."*
 
+> **Ruled Jul 25, same session:** *"It should just deal me a hand and I should be
+> allowed to put back / switch out things as I please."* — **no energy
+> check-in.** See Part 4. This deletes the Fumes/Steady/Full gate and makes the
+> whole feature smaller.
+
+### The plain version
+
+Open the app. A few cards are already dealt — enough to keep the move on time,
+most urgent first, nothing that doesn't make sense today. Don't like one? Put it
+back. Want something else? Swap it in. If there's more work left than days left,
+the app says so and shows you what it's dropping, instead of piling it on you.
+
+The rest of this file is how to build that.
+
+---
+
 That is three separate asks, and the third one is the hard one. Taken in order:
 **(1)** a computed daily effort number, **(2)** an automatic selection of the
 right cards to fill it, **(3)** the guarantee that hitting that number actually
@@ -119,27 +135,42 @@ only three levers, and the app should say so.
 
 ---
 
-## Part 4 — What happens to the energy check-in
+## Part 4 — RULED (Eloisa, Jul 25): no energy check-in. Deal, then let her edit.
 
-**Recommendation: pace becomes the truth, energy becomes the modifier.**
+> *"It should just deal me a hand and I should be allowed to put back / switch
+> out things as I please."*
 
-| Energy | Meaning under the new model |
-|--------|-----------------------------|
-| **Fumes** | Deal only the `criticalPath` subset of today's pace hand. Say plainly what slips: *"The rest moves to tomorrow — tomorrow becomes 11."* |
-| **Steady** | The pace hand, exactly. The honest day. |
-| **Full** | Pace hand + pull tomorrow's lightest cards forward. *"Tomorrow drops to 5."* |
+The fork is closed and it went the simpler way. **Delete the energy check-in.**
+Open the Board, the hand is already there, and every card is negotiable.
 
-This keeps the emotional check-in — which is one of the best ideas in the
-project — while making it *mean* something, since today's choice now visibly
-moves tomorrow's number. Under the current engine, energy changes nothing about
-the forced hand at all (`isBoundToday` doesn't take an energy argument).
+**This makes the feature smaller, not bigger.** What comes out:
 
-**This is the one genuine fork in the spec, and it's Eloisa's call.** The
-alternative reading of her request is that the app should just decide, with no
-morning check-in at all. That is a defensible, calmer design and it is less code.
-I recommend keeping the check-in because a moving app that never asks how you are
-is a different, colder product — but I'd build whichever she picks, and the
-scheduler underneath is identical either way.
+- The whole Fumes/Steady/Full gate, and with it the **big black void before a
+  pace is picked** — that ticket is now fixed by deletion, not by layout work.
+- `ENERGY_BUDGET` tiers, the energy branch in `tierEligible` / `offerEligible`,
+  and the "Steady: +2 draws" copy bug (also fixed by deletion).
+- The concept of a **bound** card that cannot be declined. If she can put
+  anything back, `isBoundToday` stops being a gate and becomes a *ranking
+  signal* — date-forced work sorts to the front of the hand, and that's all.
+
+**What's already built and just needs uncovering:** `manualToggleHand`
+(`schedule.js:478`) already adds any open task from the Ledger and puts back any
+card — including date-forced ones, deliberately — and `ensureDailyDeal` already
+carries those choices across a same-day re-deal. The Board already has a **Put
+back** button (`Screens.jsx:1409`). Roughly 80% of her request exists behind the
+energy gate.
+
+So the build is: compute the pace hand → show it immediately → keep put-back and
+draw exactly as they already work.
+
+**Two small rulings that follow:**
+
+1. **A put-back sticks for the day, not forever.** Already the behavior. Tomorrow
+   deals fresh, and if the card still matters it comes back — that's the app
+   doing its job, not nagging.
+2. **Putting back something critical gets one quiet line, never a block.**
+   *"That was today's only sublet card."* Stated once, in the card's place. She
+   is the authority on her own day; the app's job is to make sure she knew.
 
 ---
 
@@ -194,20 +225,26 @@ Honest list, so nobody ships it thinking it's finished:
 **Replaces review tickets 1 and 3.** Sized for Codex or Grok — this is scheduler
 work, not a tweak, and it touches the daily loop, so it wants a lead.
 
+- [ ] **Delete the energy check-in.** Board opens straight to a dealt hand. Takes
+      the pre-pick void and the "+2 draws" copy bug with it. **Do this first — it
+      is a deletion, and it makes everything below smaller.**
 - [ ] **Pace engine** — revive `buildMinimumSchedule` with computed capacity;
       fixtures reserve, never budget; return `{ pace, hand, cut, tomorrow }`.
 - [ ] **Board reads the pace** — show today's number and the hand that meets it;
       fixtures rendered above the hand as "happening today," not as picks.
+- [ ] **Keep put-back / draw exactly as they are.** `manualToggleHand` and the
+      Put back button already do what Eloisa asked; `isBoundToday` drops from a
+      gate to a sort key so nothing is undeclinable.
 - [ ] **Infeasibility branch** — when it doesn't fit, hold the ceiling, deal the
       day, and show the named cut list with a one-tap *"Let it go"* → `archived`.
 - [ ] **Phase filter** from `movePhase.js` — flight day deals the sweep and
       nothing else.
-- [ ] **Energy re-pointed** per Part 4 (pending Eloisa's fork decision).
 - [ ] Lane variety + `window: "business"` — after the above, if they still feel
       needed.
 
-**Ship order:** pace engine → Board reads it → infeasibility branch. The first
-two make the app usable; the third makes it honest.
+**Ship order:** delete the energy gate → pace engine → Board reads it →
+infeasibility branch. The first three make the app usable; the fourth makes it
+honest.
 
 Fan-renderer fix (review ticket 2) is **independent of all of this and should
 land first** — it is a geometry bug, and a 4-card hand renders correctly through

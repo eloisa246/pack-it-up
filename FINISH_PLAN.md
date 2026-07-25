@@ -54,10 +54,14 @@ picks which of the remaining nine (if any) enter this queue — a new model does
       - Cut order `criticalPath` → `criticality` → urgency (a naive criticality-first sort cuts
         "Lock the Aug 1 sublet" and keeps "Remove outdoor furniture" — verified in the prototype).
       - Phase filter from `movePhase.js`; flight day deals the sweep and nothing else.
-      - **Open fork for Eloisa (Part 4):** keep the morning energy check-in as a modifier on the
-        computed pace (recommended), or drop it and let the app just decide. Scheduler is identical
-        either way — decide before the Board work starts.
-      - Ship order: pace engine → Board reads it → infeasibility branch.
+      - **RULED (Eloisa, Jul 25): no energy check-in.** *"It should just deal me a hand and I
+        should be allowed to put back / switch out things as I please."* **Delete Fumes/Steady/Full
+        entirely** — that also deletes the pre-pick black void and the "+2 draws" copy bug below,
+        so strike those two nits when this lands. `isBoundToday` drops from a gate to a sort key:
+        nothing is undeclinable. Put-back/draw already exist (`manualToggleHand` + the Board's
+        Put back button) and need no work — they're just stuck behind the energy gate today.
+      - Ship order: delete the energy gate (a deletion — do it first) → pace engine → Board reads
+        it → infeasibility branch.
 - Also confirmed dead in the build, decide and act: `buildMinimumSchedule` (exported, never
   called), `branchOptions` + `nextTaskOnComplete` (normalized, never read — so both sides of every
   keep/donate decision sit live in the deck at once).

@@ -10,7 +10,7 @@
 
 **Eloisa's stated mechanic (Jul 25):** *"automatically give me the most urgent tasks that make sense for that day and the number of effort points required to keep the move moving at pace."* Specced in **`docs/design/2026-07-25-pace-driven-hand.md`** with a runnable prototype (`docs/design/tools/pace-preview.mjs`). It supersedes the review's "cap the hand" and "make energy real" tickets. The algorithm is largely `buildMinimumSchedule` — already written, never called. **The mandatory new piece is the infeasibility branch:** on seed data at a humane 8/day, 28 of 168 cards fit before the flight and 140 don't; the app must *name* the cut, not silently pile it.
 
-**Open fork awaiting Eloisa:** keep the morning energy check-in as a modifier on the computed pace (recommended), or drop it and let the app decide. Scheduler is identical either way — decide before Board work starts.
+**RULED (Eloisa, Jul 25): no energy check-in.** *"It should just deal me a hand and I should be allowed to put back / switch out things as I please."* Delete Fumes/Steady/Full — which also deletes the pre-pick black void and the "+2 draws" copy nit. Put-back and draw already work (`manualToggleHand` + the Board's Put back button); they're just stuck behind the energy gate. `isBoundToday` becomes a sort key, not a gate.
 
 **Next up:** [cursor] **fan math first** — unconditional, pure layout, independent of all pace work. Then [codex/grok] the pace engine. Both in `FINISH_PLAN.md` → Open next; Eloisa picks which of the other review tickets enter the queue.
 

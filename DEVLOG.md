@@ -18,6 +18,7 @@ Covers **July 5–10, 2026**. Combines:
 - Both fan renderers break at real card counts: apartment fan spans ~1351px on a 390px screen; Board hand clips its own tail behind `overflow: hidden`
 - FINISH_PLAN → Open next seeded with the three pre-move tickets only; the other nine are Eloisa's call
 - **Pace-driven hand specced** (Eloisa's stated mechanic): `docs/design/2026-07-25-pace-driven-hand.md` + runnable prototype `docs/design/tools/pace-preview.mjs`. Pace = smallest daily effort at which all work still fits before its deadlines (level-load, not remaining ÷ days) — which is `buildMinimumSchedule`, already written and never called. Fixtures reserve rather than budget. Mandatory infeasibility branch: at a humane 8/day only 28 of 168 seed cards fit before the flight; the app must name the 140 it cuts. Supersedes review tickets 1 and 3
+- **Eloisa ruled the energy fork same session: no check-in.** Board opens straight to a dealt hand, every card put-back-able. Deletes Fumes/Steady/Full, the pre-pick void and the "+2 draws" nit; put-back/draw already exist behind the gate
 - Session: `docs/sessions/2026-07-25-claude-opus5-redesign-review.md`
 
 ## 2026-07-19 — [Cursor / Grok 4.5]
