@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-07-25T03:52:55.174Z",
+  "last_updated": "2026-07-25T04:30:25.657Z",
   "rules": {
     "read_before_work": true,
     "write_before_editing": true,
@@ -130,7 +130,7 @@
       "thinking": "high",
       "status": "IDLE",
       "branch": "claude/game-redesign-recommendations-flsc1o",
-      "working_on": "Closed: Opus 5 redesign review (docs only)",
+      "working_on": "Shipped: hand cap + energy gate removal + fan fixes",
       "files_locked": [],
       "systems_locked": [],
       "risk_level": null,
@@ -138,7 +138,7 @@
       "rate_limited": false,
       "cooldown_until": null,
       "handoff_needed": null,
-      "last_seen": "2026-07-25T03:52:55.174Z",
+      "last_seen": "2026-07-25T04:30:25.657Z",
       "expires_at": null,
       "notes": "Premium Claude reviewer. Supports Fable on taste, docs, prose, Marcy voice, pixel-art standards."
     },
