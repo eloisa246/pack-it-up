@@ -28,15 +28,22 @@ Legend: **YES** = ship soon · **SOFT** = ship if cheap / after YES
 First read of the live build by a new model. Advisory only — **no code changed.** 12 proposed
 tickets live in the doc's table; only the three below are pre-week-of-the-move priority. Eloisa
 picks which of the remaining nine (if any) enter this queue — a new model does not reorder the plan.
+
+> **⚠ Measured on a fresh install, not Eloisa's save.** All counts below are seed
+> `INITIAL_TASKS`; her curated ledger is smaller. Re-run before acting on a magnitude:
+> `node docs/design/tools/hand-audit.mjs my-save.json 2026-07-25`. Ticket 1 (fan math) is a
+> geometry bug and stands unconditionally; tickets 2–3 should be re-checked against the real save.
+
 - [ ] **[cursor]** **Fix both fan renderers** — apartment fan spans ~1351px on a 390px screen
       (`BedroomSlice.jsx:3388`: card width clamps to 40px, step doesn't) and collides with the Sal
       widget in every room; Board hand clips its own tail behind `overflow: hidden`
       (`Screens.jsx:1239`) so most cards can't be tapped. One clamp for width+step, cap ~7 cards
       + overflow chip. Composer-sized, pure layout, can't regress the scheduler — **do this first.**
-- [ ] **[cursor]** **Cap the hand** — `dealDailyHand` forces every past-latest crit ≥ 2 card into
-      the hand, so a **Fumes** day on Jul 25 deals **69 cards / 103 effort** against a budget of 3
-      (127 on flight day). Hand becomes `min(bound, 3/5/7)` by energy, ranked by
-      `compareTaskUrgency`, plus one honest "N more past their latest date" line.
+- [ ] **[cursor]** **Cap the hand** *(re-check against her save first)* — `dealDailyHand` forces
+      every past-latest crit ≥ 2 card into the hand. On seed data a **Fumes** day on Jul 25 deals
+      **69 cards / 103 effort** against a budget of 3 (127 on flight day); on her real ledger that
+      count is lower and may already be fine. Fix either way: hand becomes `min(bound, 3/5/7)` by
+      energy, ranked by `compareTaskUrgency`, plus one honest "N more past their latest date" line.
 - [ ] **[cursor]** **Make energy real** — Fumes/Steady/Full currently produce an identical bound
       hand and differ only in offer-pile size. `ENERGY_BUDGET` `{3,6,9}` becomes the actual budget;
       `calculateTierQuotas`' remaining-effort ÷ remaining-days number becomes advisory copy.

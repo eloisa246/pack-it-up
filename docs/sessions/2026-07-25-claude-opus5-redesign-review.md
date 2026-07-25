@@ -4,6 +4,22 @@
 **Branch:** `claude/game-redesign-recommendations-flsc1o` (merged to main: **no** — pushed only;
 docs-only diff, merge is Eloisa's call since this is a first read by an unfamiliar model)
 
+### ⚠ Correction landed in this same session — read first
+Eloisa flagged it: **the measurements ran against a fresh install, not her save.** A headless
+browser has empty `localStorage`, so the build I walked was a day-one game seeded from
+`INITIAL_TASKS`. Her device has a curated ledger (things done, dates edited, cards archived), and
+`mergeTasks` treats saved membership as canonical (`save.js:136`) — so her list may not even hold
+the same 180 cards. All magnitudes below describe the seed and are almost certainly high.
+
+Fixed in-session rather than caveated away:
+- **`docs/design/tools/hand-audit.mjs`** — re-runs every measurement through the game's own boot
+  path (`mergeTasks(INITIAL_TASKS, save.tasks)`) against a real save export. One command.
+- **Part 0** of the review now splits *code facts that hold for any dataset* from *seed-conditioned
+  magnitudes that need re-running* — with the reason for each.
+- FINISH_PLAN / HANDOFF / DEVLOG all carry the provenance warning.
+
+The structural findings survive; the numbers need her data.
+
 ### Done
 - Full familiarization pass: `AGENTS.md` → `FINISH_PLAN.md` → `HANDOFF.md` → engine
   (`schedule.js`, `tasks.js`, `session.js`, `movePhase.js`) → live build walked at 390×844.

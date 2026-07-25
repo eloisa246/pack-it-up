@@ -10,6 +10,30 @@ executing the real scheduler against the real `INITIAL_TASKS`.
 Every number below is measured, not estimated. Repro lines are included so the
 next agent can check me rather than trust me.
 
+> ### ⚠ Provenance — read before quoting any number here
+>
+> **These measurements are against a fresh install** — seed `INITIAL_TASKS`, no
+> save. A headless browser has empty `localStorage`, so the live build I walked
+> was a day-one game, not Eloisa's.
+>
+> Her device has a **curated ledger**: cards marked done, dates edited in the
+> Ledger, criticality overridden, things archived. `mergeTasks` also treats saved
+> membership as canonical (`save.js:136`), so her list may not even contain the
+> same 180 cards. **Every count below — 69, 127, 79, 177, 145, 0/57 — describes
+> the seed, not her game.** Her real numbers are almost certainly smaller.
+>
+> **What that does and doesn't change** is spelled out in
+> [Part 0](#part-0--what-survives-her-save-and-what-doesnt). Short version: the
+> structural findings are code facts and hold for any dataset; the *magnitudes*
+> are seed-conditioned and need re-running.
+>
+> **To re-run everything against the real save**, from the repo root:
+> ```bash
+> node docs/design/tools/hand-audit.mjs my-save.json 2026-07-25
+> ```
+> (Settings → "Copy canonical mobile save" → paste into `my-save.json`.
+> Read-only; run with no arguments to reproduce this document's baseline.)
+
 > **Identity note for the ledger:** I claimed the `claude_opus` slot, which is
 > described in `artifacts/agent_ledger.json` as Opus 4.8. I am **Opus 5**, a
 > different model. Advisory-only work, no game code touched, no locks held.
@@ -30,6 +54,46 @@ pressure meter, FINAL CALL — inverts into its opposite in exactly the final we
 it was built for. On a **Fumes** day today the game deals **69 mandatory cards**
 against a design budget of 3. That is the whole review. Everything else is
 detail.
+
+---
+
+## Part 0 — What survives her save, and what doesn't
+
+Because the measurements are seed-conditioned, here is the honest split. Nothing
+in the left column depends on how much Eloisa has done; everything in the right
+column needs `hand-audit.mjs` re-run before it is quoted at her.
+
+### Holds for any dataset — these are code facts
+
+| # | Finding | Why it's save-independent |
+|---|---------|---------------------------|
+| M2 | **Energy never changes the bound hand.** | `isBoundToday` takes no energy argument at all (`schedule.js:191`). `dealDailyHand` computes `bound` before energy is consulted; energy only gates `offerEligible` and the quota. Fumes and Full produce the same forced hand **by construction**, for every possible save. |
+| M2b | **Two incompatible definitions of "a day's work" ship together.** | `ENERGY_BUDGET {3,6,9}` vs `calculateTierQuotas`' remaining-effort ÷ remaining-days. Both in source. |
+| M1b | **No triage verb exists.** | Nothing in the engine ever proposes archiving, and nothing decays a card whose window closed. `archived` is reachable only by manual Ledger tap. |
+| M1c | **`buildMinimumSchedule` is dead.** | Exported, never called. `grep`-verifiable. |
+| M4 | **Decision branches never resolve.** | `branchOptions` / `nextTaskOnComplete` normalized at `schedule.js:69-70`, read nowhere. Completing a `*_decide` card cannot archive the losing branch, in any save. |
+| A2 | **Both fan renderers break above ~8 cards.** | Pure geometry. Apartment fan: card width clamps at 40px, step doesn't (`BedroomSlice.jsx:3388`). Board hand: 8px step floor under `overflow: hidden` (`Screens.jsx:1239`). Her hand size decides *whether she hits it*, not whether it's broken. |
+| A1 | **~62% of the apartment screen is manufactured filler.** | Layout code (`BedroomSlice.jsx:4540`), independent of task data. |
+| A3, A4, A6, A8 | Void empty states · emoji icons under `pixelated` · nine data points per Ledger row · lane colour drift | All chrome. No task data involved. |
+| A5 | **Calendar X's every past day regardless of outcome.** | The mark is drawn from `isPast`, which is date arithmetic (`movePhase.js:222`). It cannot distinguish a day you cleared from a day you lost. |
+
+### Needs re-running before it's quoted
+
+| Claim (seed value) | Why her number differs |
+|--------------------|------------------------|
+| 69 bound cards / 103 effort today | Every card she's marked done leaves the pool |
+| 127 cards on flight day | Same |
+| 79 tasks in FINAL CALL at once | Same |
+| Pressure pinned 3 from Jul 12 | Pinned only while ≥1 real crit-2 card sits past-latest. If she's cleared or archived them, it falls — and the meter is honest after all |
+| "177 open · 145 · 19 · 13" badges | Direct open-counts |
+| 0/57 packed, 0/13 bedroom | Fresh-install artifact; she has packed things |
+| 42/180 (23%) world-bound | Ratio is authored in `tasks.js` so it's roughly stable, but the *open* count shifts |
+
+**The one that could genuinely flip a ticket:** if her real hand is already
+single-digit, "cap the hand" drops from urgent to structural — worth doing before
+the *next* move, not this week. **"Fix the fan math" does not flip**; it is a
+geometry bug at any count above about eight, and the clipped `T…sk…` next to the
+Sal widget is visible on a fresh install, which means it is visible on hers too.
 
 ---
 
@@ -377,12 +441,17 @@ Ranked by (value to Eloisa this week) ÷ (risk of breaking the build).
 **Post-move / do not start now:** U-Box capacity model (M6), two-deck split (M5),
 portrait room authoring (A1.2), card instrument-panel simplification (A6).
 
-**Items 1–3 are the ones that matter this week.** They are all in `schedule.js`
-and `BedroomSlice.jsx` fan math, they are all small, and together they turn the
-final six days from the app's worst experience into its best.
+**Item 2 (fan math) is unconditional** — it's a geometry bug, visible on a fresh
+install, therefore visible on hers. **Items 1 and 3 should be re-checked against
+her real save first** (`hand-audit.mjs`); if her bound hand is already small,
+item 1 is structural rather than urgent. Item 3 holds either way, since energy
+cannot change the bound hand by construction — but it stops being an emergency.
 
 ---
 
 *Reviewed by Claude Opus 5, advisory only — no game code changed this session.
 Findings verified against the live build at 390×844 and against the real
-scheduler executed over `INITIAL_TASKS`. Merge to `main` is Eloisa's call.*
+scheduler executed over **seed `INITIAL_TASKS`, not Eloisa's save** — see the
+provenance box at the top and Part 0 for what that does and doesn't affect.
+Re-run with `docs/design/tools/hand-audit.mjs` against the real save before
+quoting any magnitude. Merge to `main` is Eloisa's call.*
