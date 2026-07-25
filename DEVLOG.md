@@ -17,6 +17,7 @@ Covers **July 5–10, 2026**. Combines:
 - Confirmed dead code: `buildMinimumSchedule` (never called), `branchOptions` / `nextTaskOnComplete` (never read — both sides of every keep/donate decision live in the deck)
 - Both fan renderers break at real card counts: apartment fan spans ~1351px on a 390px screen; Board hand clips its own tail behind `overflow: hidden`
 - FINISH_PLAN → Open next seeded with the three pre-move tickets only; the other nine are Eloisa's call
+- **Pace-driven hand specced** (Eloisa's stated mechanic): `docs/design/2026-07-25-pace-driven-hand.md` + runnable prototype `docs/design/tools/pace-preview.mjs`. Pace = smallest daily effort at which all work still fits before its deadlines (level-load, not remaining ÷ days) — which is `buildMinimumSchedule`, already written and never called. Fixtures reserve rather than budget. Mandatory infeasibility branch: at a humane 8/day only 28 of 168 seed cards fit before the flight; the app must name the 140 it cuts. Supersedes review tickets 1 and 3
 - Session: `docs/sessions/2026-07-25-claude-opus5-redesign-review.md`
 
 ## 2026-07-19 — [Cursor / Grok 4.5]

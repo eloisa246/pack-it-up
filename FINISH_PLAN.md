@@ -39,15 +39,25 @@ picks which of the remaining nine (if any) enter this queue — a new model does
       widget in every room; Board hand clips its own tail behind `overflow: hidden`
       (`Screens.jsx:1239`) so most cards can't be tapped. One clamp for width+step, cap ~7 cards
       + overflow chip. Composer-sized, pure layout, can't regress the scheduler — **do this first.**
-- [ ] **[cursor]** **Cap the hand** *(re-check against her save first)* — `dealDailyHand` forces
-      every past-latest crit ≥ 2 card into the hand. On seed data a **Fumes** day on Jul 25 deals
-      **69 cards / 103 effort** against a budget of 3 (127 on flight day); on her real ledger that
-      count is lower and may already be fine. Fix either way: hand becomes `min(bound, 3/5/7)` by
-      energy, ranked by `compareTaskUrgency`, plus one honest "N more past their latest date" line.
-- [ ] **[cursor]** **Make energy real** — Fumes/Steady/Full currently produce an identical bound
-      hand and differ only in offer-pile size. `ENERGY_BUDGET` `{3,6,9}` becomes the actual budget;
-      `calculateTierQuotas`' remaining-effort ÷ remaining-days number becomes advisory copy.
-      (Fixing this re-words the "+2 draws" blurb below — do them together.)
+- [ ] **[codex/grok]** **Pace-driven hand** — spec: **`docs/design/2026-07-25-pace-driven-hand.md`**,
+      runnable prototype: `docs/design/tools/pace-preview.mjs`. **Eloisa's stated mechanic**
+      (Jul 25): *"automatically give me the most urgent tasks that make sense for that day and the
+      number of effort points required to keep the move moving at pace."* **Supersedes the earlier
+      "cap the hand at 3/5/7" and "make energy real" tickets** — both were blunter versions of this.
+      - Pace = smallest daily effort at which all work still fits before its deadlines
+        (level-load, not remaining ÷ days). Revives `buildMinimumSchedule`, which is this algorithm
+        already written and never called.
+      - Fixtures (`exactDate` / `kind:"attend"`) reserve their day; never budget, never cut.
+      - **Infeasibility branch is mandatory** — on seed data everything fits only above 60/day;
+        at a humane 8/day, 28 of 168 cards fit and 140 don't. When it doesn't fit, hold the ceiling,
+        deal the day, and show the **named** cut list with one-tap "Let it go" → `archived`.
+      - Cut order `criticalPath` → `criticality` → urgency (a naive criticality-first sort cuts
+        "Lock the Aug 1 sublet" and keeps "Remove outdoor furniture" — verified in the prototype).
+      - Phase filter from `movePhase.js`; flight day deals the sweep and nothing else.
+      - **Open fork for Eloisa (Part 4):** keep the morning energy check-in as a modifier on the
+        computed pace (recommended), or drop it and let the app just decide. Scheduler is identical
+        either way — decide before the Board work starts.
+      - Ship order: pace engine → Board reads it → infeasibility branch.
 - Also confirmed dead in the build, decide and act: `buildMinimumSchedule` (exported, never
   called), `branchOptions` + `nextTaskOnComplete` (normalized, never read — so both sides of every
   keep/donate decision sit live in the deck at once).

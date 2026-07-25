@@ -8,7 +8,11 @@
 
 **Headline (seed numbers):** a **Fumes** day on Jul 25 deals **69 bound cards / 103 effort** against a design budget of 3 (127 on flight day); `taskPressure` pinned at 3 every day Jul 12→31. **Holds regardless of save:** energy cannot change the bound hand — `isBoundToday` takes no energy argument — and both fan renderers break above ~8 cards (apartment fan spans ~1351px on a 390px screen; the Board hand clips its own tail so those cards can't be tapped).
 
-**Next up:** [cursor] **fan math first** — unconditional, pure layout, visible on a fresh install therefore visible on hers. Cap-the-hand and make-energy-real should be re-checked against the real save first. All three in `FINISH_PLAN.md` → Open next; Eloisa picks which of the other nine tickets enter the queue.
+**Eloisa's stated mechanic (Jul 25):** *"automatically give me the most urgent tasks that make sense for that day and the number of effort points required to keep the move moving at pace."* Specced in **`docs/design/2026-07-25-pace-driven-hand.md`** with a runnable prototype (`docs/design/tools/pace-preview.mjs`). It supersedes the review's "cap the hand" and "make energy real" tickets. The algorithm is largely `buildMinimumSchedule` — already written, never called. **The mandatory new piece is the infeasibility branch:** on seed data at a humane 8/day, 28 of 168 cards fit before the flight and 140 don't; the app must *name* the cut, not silently pile it.
+
+**Open fork awaiting Eloisa:** keep the morning energy check-in as a modifier on the computed pace (recommended), or drop it and let the app decide. Scheduler is identical either way — decide before Board work starts.
+
+**Next up:** [cursor] **fan math first** — unconditional, pure layout, independent of all pace work. Then [codex/grok] the pace engine. Both in `FINISH_PLAN.md` → Open next; Eloisa picks which of the other review tickets enter the queue.
 
 **Nag:** flight **Jul 31 — six days.** Vet window Jul 22–**25 closes today**; sublet still unlocked; U-Box lands Jul 29 and nothing is packed. Those outrank every ticket in this file.
 
