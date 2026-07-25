@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-07-19T22:29:40.303Z",
+  "last_updated": "2026-07-25T04:30:25.657Z",
   "rules": {
     "read_before_work": true,
     "write_before_editing": true,
@@ -128,25 +128,17 @@
       "model": "Opus 4.8",
       "role": "Senior Reviewer / Taste + Reasoning Specialist",
       "thinking": "high",
-      "status": "ACTIVE",
-      "branch": null,
-      "working_on": "ChatGPT prioritization-fixes card: Phase 1 = Daily Hand bound/offer logic (stop binding future crit-3, fumes offers, exclude unavailable/future/outcome)",
-      "files_locked": [
-        "artifacts/pack-it-up/src/schedule.js",
-        "artifacts/pack-it-up/src/tasks.js",
-        "artifacts/pack-it-up/src/Screens.jsx"
-      ],
-      "systems_locked": [
-        "daily-deal",
-        "urgency",
-        "ledger"
-      ],
-      "risk_level": "medium",
+      "status": "IDLE",
+      "branch": "claude/game-redesign-recommendations-flsc1o",
+      "working_on": "Shipped: hand cap + energy gate removal + fan fixes",
+      "files_locked": [],
+      "systems_locked": [],
+      "risk_level": null,
       "commit_authority": false,
       "rate_limited": false,
       "cooldown_until": null,
       "handoff_needed": null,
-      "last_seen": "2026-07-13T21:01:38.723Z",
+      "last_seen": "2026-07-25T04:30:25.657Z",
       "expires_at": null,
       "notes": "Premium Claude reviewer. Supports Fable on taste, docs, prose, Marcy voice, pixel-art standards."
     },

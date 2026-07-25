@@ -3378,7 +3378,15 @@ export default function PackItUp({ glowMode = "split", initialScreen = "apartmen
   const hand = session?.energy && session?.dailyDeal
     ? handTasks(tasks, session.dailyDeal)
     : [];
-  const fanCards = hand;
+  /**
+   * The apartment fan tucks into the bottom-left corner beside the action bar,
+   * so it gets far less room than the Board's hand — 4 cards is what stays
+   * legible there. Uncapped, the step below (which never shrank with the card)
+   * ran the fan ~1350px wide on a 390px phone: it left the screen entirely and
+   * collided with the contacts widget. The badge shows the true hand size.
+   */
+  const APT_FAN_MAX = 4;
+  const fanCards = hand.slice(0, APT_FAN_MAX);
   const fanPreferredW = Math.max(40, Math.min(160, fanLayout.cardW || FAN_DEFAULTS.cardW));
   // Same idea as Command Board hand: keep the fan inside a max span; shrink cards as n grows.
   const fanMaxSpan = Math.min(
@@ -3394,7 +3402,16 @@ export default function PackItUp({ glowMode = "split", initialScreen = "apartmen
     return Math.max(40, Math.min(fanPreferredW, fit));
   })();
   const fanCardH = Math.round(fanCardW * (487 / 284));
-  const fanStep = Math.max(14, Math.round(fanCardW * fanStepRatio));
+  // Step is derived from the SAME span the card width was fitted to. The old
+  // `Math.max(14, …)` floor ignored that span, so every extra card widened the
+  // fan without bound even after the cards had stopped shrinking.
+  const fanStep = (() => {
+    const n = Math.max(1, fanCards.length);
+    if (n <= 1) return 0;
+    const byRatio = Math.round(fanCardW * fanStepRatio);
+    const bySpan = Math.floor((fanMaxSpan - fanCardW) / (n - 1));
+    return Math.max(8, Math.min(byRatio, Math.max(8, bySpan)));
+  })();
   const fanW = fanCardW + Math.max(0, fanCards.length - 1) * fanStep;
   const fanLayoutApt = (n, i) => {
     if (n <= 1) return { left: 0, rot: -6, lift: 0 };
@@ -4964,7 +4981,7 @@ export default function PackItUp({ glowMode = "split", initialScreen = "apartmen
               background: "#C43B34", color: "#F3EDDD", fontSize: 11, border: "2px solid #120A04",
               cursor: "move", touchAction: "none", ...ui.label,
             }}
-          >{fanCards.length}</span>
+          >{hand.length}</span>
           <div
             onPointerDown={(e) => onFanPointerDown(e, "resize")}
             onPointerMove={onFanPointerMove}

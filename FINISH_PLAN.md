@@ -24,6 +24,48 @@ Legend: **YES** = ship soon · **SOFT** = ship if cheap / after YES
 
 ## Open next (Jul 11 — after Grok env/storage session)
 
+### Redesign review — [claude/opus5] (Jul 25) — ruling doc: `docs/design/2026-07-25-opus5-redesign-review.md`
+First read of the live build by a new model. Advisory only — **no code changed.** 12 proposed
+tickets live in the doc's table; only the three below are pre-week-of-the-move priority. Eloisa
+picks which of the remaining nine (if any) enter this queue — a new model does not reorder the plan.
+
+> **⚠ Measured on a fresh install, not Eloisa's save.** All counts below are seed
+> `INITIAL_TASKS`; her curated ledger is smaller. Re-run before acting on a magnitude:
+> `node docs/design/tools/hand-audit.mjs my-save.json 2026-07-25`. Ticket 1 (fan math) is a
+> geometry bug and stands unconditionally; tickets 2–3 should be re-checked against the real save.
+
+- [ ] **[cursor]** **Fix both fan renderers** — apartment fan spans ~1351px on a 390px screen
+      (`BedroomSlice.jsx:3388`: card width clamps to 40px, step doesn't) and collides with the Sal
+      widget in every room; Board hand clips its own tail behind `overflow: hidden`
+      (`Screens.jsx:1239`) so most cards can't be tapped. One clamp for width+step, cap ~7 cards
+      + overflow chip. Composer-sized, pure layout, can't regress the scheduler — **do this first.**
+- [ ] **[codex/grok]** **Pace-driven hand** — spec: **`docs/design/2026-07-25-pace-driven-hand.md`**,
+      runnable prototype: `docs/design/tools/pace-preview.mjs`. **Eloisa's stated mechanic**
+      (Jul 25): *"automatically give me the most urgent tasks that make sense for that day and the
+      number of effort points required to keep the move moving at pace."* **Supersedes the earlier
+      "cap the hand at 3/5/7" and "make energy real" tickets** — both were blunter versions of this.
+      - Pace = smallest daily effort at which all work still fits before its deadlines
+        (level-load, not remaining ÷ days). Revives `buildMinimumSchedule`, which is this algorithm
+        already written and never called.
+      - Fixtures (`exactDate` / `kind:"attend"`) reserve their day; never budget, never cut.
+      - **Infeasibility branch is mandatory** — on seed data everything fits only above 60/day;
+        at a humane 8/day, 28 of 168 cards fit and 140 don't. When it doesn't fit, hold the ceiling,
+        deal the day, and show the **named** cut list with one-tap "Let it go" → `archived`.
+      - Cut order `criticalPath` → `criticality` → urgency (a naive criticality-first sort cuts
+        "Lock the Aug 1 sublet" and keeps "Remove outdoor furniture" — verified in the prototype).
+      - Phase filter from `movePhase.js`; flight day deals the sweep and nothing else.
+      - **RULED (Eloisa, Jul 25): no energy check-in.** *"It should just deal me a hand and I
+        should be allowed to put back / switch out things as I please."* **Delete Fumes/Steady/Full
+        entirely** — that also deletes the pre-pick black void and the "+2 draws" copy bug below,
+        so strike those two nits when this lands. `isBoundToday` drops from a gate to a sort key:
+        nothing is undeclinable. Put-back/draw already exist (`manualToggleHand` + the Board's
+        Put back button) and need no work — they're just stuck behind the energy gate today.
+      - Ship order: delete the energy gate (a deletion — do it first) → pace engine → Board reads
+        it → infeasibility branch.
+- Also confirmed dead in the build, decide and act: `buildMinimumSchedule` (exported, never
+  called), `branchOptions` + `nextTaskOnComplete` (normalized, never read — so both sides of every
+  keep/donate decision sit live in the deck at once).
+
 ### World-truth code pass — [cursor] (Jul 19) — see `docs/sessions/2026-07-19-cursor-world-truth.md`
 - [x] **manual-Done sticks** — hand Done never silently reopened by `reconcileTasksFromWorldState` (`manualDone` flag + test)
 - [x] **Set-dressing** — plants / sill bottles / wastebasket / side-cabinet out of packable catalog; art stays

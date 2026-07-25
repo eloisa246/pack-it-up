@@ -37,7 +37,12 @@ export function defaultSession() {
     appt: 0,
     messages: 0,
     backups: 0,
-    energy: null, // null | "fumes" | "steady" | "full"
+    // Ruled Jul 25 (Eloisa): no morning energy check-in — the Board opens
+    // straight to a dealt hand. The tier is pinned so `ensureDailyDeal` always
+    // has something to deal with; the Fumes/Steady/Full UI is gone. Kept as a
+    // field (rather than ripped out of schedule.js mid-move) so this stays a
+    // small, reversible diff.
+    energy: "steady",
     dailyDeal: null, // persisted hand for the local day (see schedule.js)
     calmedZones: {},
     lastIncomingDay: null, // todayKey() of the last NPC incoming call, one-per-day guard
@@ -49,9 +54,9 @@ export function mergeSession(savedSession) {
   const fresh = defaultSession();
   if (!savedSession || typeof savedSession !== "object") return fresh;
   if (savedSession.day !== fresh.day) return fresh;
-  const energy = ["fumes", "steady", "full"].includes(savedSession.energy)
-    ? savedSession.energy
-    : null;
+  // A save from before the check-in was removed may carry null / "fumes" / "full".
+  // Everything now deals at the pinned tier, so normalize on load.
+  const energy = "steady";
   const dailyDeal = savedSession.dailyDeal && typeof savedSession.dailyDeal === "object"
     && savedSession.dailyDeal.day === fresh.day
     ? {

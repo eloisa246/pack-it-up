@@ -9,6 +9,18 @@ Covers **July 5–10, 2026**. Combines:
 
 ---
 
+## 2026-07-25 — [Claude Code / Opus 5]
+- Redesign review of the live build (docs only, **no game code changed**): `docs/design/2026-07-25-opus5-redesign-review.md` — 6 mechanical + 8 aesthetic findings, ranked 12-ticket table, 3 evidence screenshots in `docs/design/screens/`
+- **Caveat, corrected same session:** measurements ran against a **fresh install** (seed `INITIAL_TASKS`, empty localStorage), not Eloisa's curated save — magnitudes describe the seed. Added `docs/design/tools/hand-audit.mjs` to re-run every number against a real save export, plus Part 0 of the review splitting code-facts from seed-conditioned numbers
+- Seed numbers: **Fumes day Jul 25 = 69 bound cards / 103 effort** vs a budget of 3 (127 on flight day); `taskPressure` pinned at 3 every day Jul 12→31; 79 of 180 in FINAL CALL at once
+- Save-independent by construction: Fumes/Steady/Full produce an identical bound hand (`isBoundToday` takes no energy argument); both fan renderers break above ~8 cards
+- Confirmed dead code: `buildMinimumSchedule` (never called), `branchOptions` / `nextTaskOnComplete` (never read — both sides of every keep/donate decision live in the deck)
+- Both fan renderers break at real card counts: apartment fan spans ~1351px on a 390px screen; Board hand clips its own tail behind `overflow: hidden`
+- FINISH_PLAN → Open next seeded with the three pre-move tickets only; the other nine are Eloisa's call
+- **Pace-driven hand specced** (Eloisa's stated mechanic): `docs/design/2026-07-25-pace-driven-hand.md` + runnable prototype `docs/design/tools/pace-preview.mjs`. Pace = smallest daily effort at which all work still fits before its deadlines (level-load, not remaining ÷ days) — which is `buildMinimumSchedule`, already written and never called. Fixtures reserve rather than budget. Mandatory infeasibility branch: at a humane 8/day only 28 of 168 seed cards fit before the flight; the app must name the 140 it cuts. Supersedes review tickets 1 and 3
+- **Eloisa ruled the energy fork same session: no check-in.** Board opens straight to a dealt hand, every card put-back-able. Deletes Fumes/Steady/Full, the pre-pick void and the "+2 draws" nit; put-back/draw already exist behind the gate
+- Session: `docs/sessions/2026-07-25-claude-opus5-redesign-review.md`
+
 ## 2026-07-19 — [Cursor / Grok 4.5]
 - World-truth code pass: manual-Done sticks (`manualDone`), set-dressing catalog drop, `living:tv` Roku split, personal laptop carry-on
 - Fresh-install bindings for `f_buyer_tv` / `f_remove_tv`; binding stub tests run under plain Node on Windows

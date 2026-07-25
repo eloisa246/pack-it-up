@@ -391,6 +391,17 @@ export function taskScheduleKey(tasks, today = new Date()) {
   return `${dateKey(today)}:${JSON.stringify(rows)}`;
 }
 
+/**
+ * Hand cap (Eloisa, Jul 25): "just deal me a hand and let me put back / switch
+ * out things as I please." A hand is a hand — past-latest work piles up without
+ * limit as the move closes in (69 cards on a seed Jul 25, 127 on flight day), so
+ * the date-forced set is ranked and TRUNCATED here. What doesn't make the cut
+ * isn't lost: it stays at the front of the draw deck and in the Ledger.
+ */
+export const HAND_CAP = 5;
+/** Draw deck size. Fixed and generous — the Ledger is the real long tail. */
+const OFFER_POOL_SIZE = 20;
+
 export function dealDailyHand(tasks, energy = "steady", today = new Date()) {
   const todayK = dateKey(today);
   const openTasks = normalizeTasks(tasks).filter(isOpen);
@@ -400,7 +411,11 @@ export function dealDailyHand(tasks, energy = "steady", today = new Date()) {
   // non-selfTarget deadlines, daily-recurrence). We no longer fill bound with
   // ranked crit-3 until the fumes quota — that pulled future (Jul-27+) operational
   // cards into today. The quota is a "how much to select" target, not a binder.
-  const bound = ranked.filter((t) => isBoundToday(t, today, openTasks));
+  // Ranked, then capped. `deferred` are still date-forced and still urgent —
+  // they simply aren't in today's hand, and they lead the draw deck below.
+  const boundAll = ranked.filter((t) => isBoundToday(t, today, openTasks));
+  const bound = boundAll.slice(0, HAND_CAP);
+  const deferredCount = boundAll.length - bound.length;
   const boundSet = new Set(bound.map((t) => t.id));
   const boundEffort = bound.reduce((sum, t) => sum + effortOf(t), 0);
   // Offer pile: ranked, actionable (isActionable already drops blocked-by-deps,
@@ -409,14 +424,13 @@ export function dealDailyHand(tasks, energy = "steady", today = new Date()) {
   const eligiblePool = ranked.filter((t) => (
     !boundSet.has(t.id) && isActionable(t, today, openTasks) && offerEligible(t, energy)
   ));
-  // fumes target = just the date-forced floor (require 0 optional; offers are
-  // voluntary). steady/full use their computed effort quotas.
-  const target = energy === "fumes" ? boundEffort : (quotas[energy] ?? quotas.steady);
-  const requiredOptionalEffort = Math.max(0, target - boundEffort);
-  const poolLimit = energy === "full"
-    ? Math.max(8, requiredOptionalEffort * 3)
-    : Math.max(6, requiredOptionalEffort * 2); // fumes/steady still get 6+ to draw/swap
-  const offerList = eligiblePool.slice(0, poolLimit);
+  // The draw is genuinely optional now. The old target was a quota
+  // (remaining effort / remaining days), which on a real ledger reads
+  // "Draw · 110 effort left" — nagging someone to take MORE than the hand they
+  // were just dealt. The hand is the day; anything else is her choice.
+  const target = boundEffort;
+  const requiredOptionalEffort = 0;
+  const offerList = eligiblePool.slice(0, OFFER_POOL_SIZE);
   const effortById = {};
   for (const t of [...bound, ...offerList]) effortById[t.id] = effortOf(t);
   const overloadReasons = openTasks
@@ -425,6 +439,9 @@ export function dealDailyHand(tasks, energy = "steady", today = new Date()) {
   return {
     day: todayKey(today), energy,
     boundTaskIds: bound.map((t) => t.id), boundTotal: bound.length, boundEffort,
+    // How many date-forced cards were held back by HAND_CAP (UI shows this so
+    // the truncation is never silent).
+    deferredCount,
     offerTaskIds: offerList.map((t) => t.id), selectedTaskIds: bound.map((t) => t.id),
     fumesIds: bound.filter((t) => t.criticality === 3).map((t) => t.id), effortById,
     requiredOptionalEffort, minimumEffort: quotas.fumes,

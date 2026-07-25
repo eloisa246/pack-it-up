@@ -31,14 +31,7 @@ import MENU_ICON_CAT from "./assets/items/packitup_cropped_assets/ui_mockups/men
 import MENU_ICON_GEAR from "./assets/items/packitup_cropped_assets/ui_mockups/menu_slices/gear_icon.png";
 import BOARD_HEADER_FRAME from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/header_command_board.png";
 import BOARD_BACK_BUTTON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/back_button.png";
-import BOARD_ENERGY_LABEL from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/energy_label_chip.png";
 import BOARD_FIXED_DAY_CHIP from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/fixed_day_chip.png";
-import BOARD_FUMES_OFF from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/fumes_off.png";
-import BOARD_FUMES_ON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/fumes_on.png";
-import BOARD_STEADY_OFF from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/steady_off.png";
-import BOARD_STEADY_ON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/steady_on.png";
-import BOARD_FULL_OFF from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/full_off.png";
-import BOARD_FULL_ON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/full_on.png";
 import BOARD_DRAW_BUTTON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/draw_button.png";
 import BOARD_SCROLLBAR from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/scrollbar_track.png";
 import BOARD_LEDGER_BUTTON from "./assets/items/packitup_cropped_assets/ui_mockups/board_slices/ledger_button_frame.png";
@@ -1130,12 +1123,9 @@ function CriticalStrip() {
   );
 }
 
-/** Command-board chrome: segmented energy row + custom scrollbar theming for the draw pile. */
-const BOARD_ENERGY_SEGMENTS = [
-  { id: "fumes", label: "FUMES", off: BOARD_FUMES_OFF, on: BOARD_FUMES_ON, sub: "bound must-dos only" },
-  { id: "steady", label: "STEADY", off: BOARD_STEADY_OFF, on: BOARD_STEADY_ON, sub: "bound + draw 2 more" },
-  { id: "full", label: "FULL", off: BOARD_FULL_OFF, on: BOARD_FULL_ON, sub: "bound + draw 4 more" },
-];
+/* Command-board chrome: custom scrollbar theming for the draw pile. The
+   segmented Fumes/Steady/Full row was removed Jul 25 — the Board deals a hand on
+   open. Its six slice PNGs are left on disk in case the check-in ever returns. */
 const boardChromeCss = (
   <style>{`
     .board-draw-pane::-webkit-scrollbar { width: 10px; }
@@ -1146,10 +1136,12 @@ const boardChromeCss = (
 );
 
 function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast, world }) {
-  const energy = session?.energy || null;
+  // No energy check-in (ruled Jul 25) — the hand is already dealt when you open
+  // the Board. `energy` stays pinned so the deal machinery has a tier.
+  const energy = session?.energy || "steady";
   const deal = session?.dailyDeal;
-  const picks = energy && deal ? handTasks(tasks, deal) : [];
-  const offers = energy && deal ? offerTasks(tasks, deal) : [];
+  const picks = deal ? handTasks(tasks, deal) : [];
+  const offers = deal ? offerTasks(tasks, deal) : [];
   const progress = dealProgress(deal);
   const [focusId, setFocusId] = useState(null);
   const handRef = useRef(null);
@@ -1202,10 +1194,6 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
     onSessionBump?.("cleared", 1, "Cleared +1");
     if (focusId === id) setFocusId(null);
   };
-  const pickEnergy = (id) => {
-    setFocusId(null);
-    onSessionBump?.("energy", 0, null, { energy: id, dealTasks: tasks });
-  };
   const toggleOffer = (id) => {
     onSessionBump?.("dealPick", 0, null, { toggleDealId: id });
   };
@@ -1213,9 +1201,12 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
     onSessionBump?.("manualPick", 0, null, { manualToggleId: id, manualToggleTasks: tasks });
     if (focusId === id) setFocusId(null);
   };
-  const drawLabel = progress.requiredOptionalEffort > 0
-    ? `Draw · ${progress.remainingEffort} effort left`
-    : "Draw (optional)";
+  // Never nag her to take more than the hand she was just dealt. If the cap held
+  // cards back, say so plainly instead — the truncation is never silent.
+  const heldBack = Math.max(0, Number(deal?.deferredCount) || 0);
+  const drawLabel = heldBack > 0
+    ? `${heldBack} more past their latest date — draw one if you want it.`
+    : "Draw one if you want it.";
   const focus = picks.find((t) => t.id === focusId) || null;
 
   /** Hand card size is derived from WIDTH only (stable cap) — never inflated by leftover vertical space. */
@@ -1225,8 +1216,19 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
   const HAND_LIFT_ALLOWANCE = 16;
   /** Responsive cap: lands ~155 CSS px on a typical 390-414px-wide hand, never above 160. */
   const HAND_CARD_CAP = Math.round(Math.min(160, Math.max(120, handW * 0.42)));
+  /**
+   * Hard render cap. Without it the fan divides the panel by however many cards
+   * are in hand: at 16 every card was a ~9px sliver with an unreadable title, and
+   * the 8px step floor below pushed the tail outside `overflow: hidden` — those
+   * cards could not be tapped at all. The hand is capped upstream too
+   * (`HAND_CAP`), but she can add freely from the Ledger, so the renderer must
+   * hold its own line. Overflow is shown as a chip, never dropped silently.
+   */
+  const HAND_FAN_MAX = 8;
+  const fanned = picks.slice(0, HAND_FAN_MAX);
+  const fanHidden = picks.length - fanned.length;
   const handCardW = (() => {
-    const n = Math.max(1, picks.length);
+    const n = Math.max(1, fanned.length);
     const avail = Math.max(80, handW - HAND_PAD * 2);
     const byRatio = n <= 1 ? avail : avail / (1 + (n - 1) * HAND_STEP_RATIO);
     const byMinStep = n <= 1 ? avail : avail - (n - 1) * HAND_MIN_STEP;
@@ -1242,7 +1244,9 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
     if (n <= 1) return { left: Math.max(HAND_PAD, (width - cardW) / 2), rot: -2, lift: 0 };
     const maxTravel = Math.max(0, avail - cardW);
     const ideal = maxTravel / Math.max(1, n - 1);
-    const step = Math.max(8, Math.min(cardW * HAND_STEP_RATIO, ideal));
+    // No lower floor: a floor larger than `ideal` pushes the last cards past the
+    // panel edge, where `overflow: hidden` eats them. Overlap harder instead.
+    const step = Math.min(cardW * HAND_STEP_RATIO, ideal);
     const span = cardW + (n - 1) * step;
     const start = HAND_PAD + Math.max(0, (avail - span) / 2);
     const t = i / (n - 1);
@@ -1291,45 +1295,19 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
           </div>
         </div>
 
-        {/* ENERGY segmented row + FIXED DAY indicator */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, flex: "0 0 auto", overflowX: "auto" }}>
-          <div style={{
-            position: "relative", flex: "0 0 auto", width: 62, aspectRatio: "274 / 103",
-            backgroundImage: `url(${BOARD_ENERGY_LABEL})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
-            imageRendering: "pixelated",
-          }} />
-          {BOARD_ENERGY_SEGMENTS.map((seg) => (
-            <button
-              key={seg.id}
-              type="button"
-              onClick={() => pickEnergy(seg.id)}
-              aria-pressed={energy === seg.id}
-              style={{
-                position: "relative", flex: "1 1 0", minWidth: 0, aspectRatio: "223 / 95",
-                backgroundImage: `url(${energy === seg.id ? seg.on : seg.off})`,
-                backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
-                backgroundColor: "transparent", appearance: "none", WebkitAppearance: "none",
-                border: "none", padding: 0, cursor: "pointer", imageRendering: "pixelated",
-              }}
-            />
-          ))}
-          {deal?.fixedDay && (
+        {/* FIXED DAY indicator (the energy check-in was removed Jul 25 — the
+            Board opens straight to a dealt hand, and every card is negotiable) */}
+        {deal?.fixedDay && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flex: "0 0 auto" }}>
             <div style={{
               position: "relative", flex: "0 0 auto", width: 74, aspectRatio: "237 / 103",
               backgroundImage: `url(${BOARD_FIXED_DAY_CHIP})`, backgroundSize: "100% 100%", backgroundRepeat: "no-repeat",
               imageRendering: "pixelated",
             }} />
-          )}
-        </div>
-
-        {!energy ? (
-          <div style={{ ...FR, padding: "10px 12px", flex: "0 0 auto" }}>
-            <div style={{ color: "#F2E4C0", fontSize: 10, lineHeight: 1.5, ...LB }}>
-              Pick a pace above to start your day — Fumes: bound must-dos only ·
-              Steady: + 2 draws · Full: + 4 draws.
-            </div>
           </div>
-        ) : (
+        )}
+
+        {(
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 6 }}>
             {/* OPTIONAL DRAW pane — same ref/measurement contract as before, restyled to the mockup frame */}
             <div
@@ -1422,6 +1400,9 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
             }}>
               <div style={{ color: "#FFD97A", fontSize: 10, textAlign: "center", marginBottom: 4, flex: "0 0 auto", ...LB }}>
                 YOUR HAND · TAP A CARD
+                {fanHidden > 0 && (
+                  <span style={{ color: "#E8C4A8" }}> · +{fanHidden} in the ledger</span>
+                )}
               </div>
               <div
                 ref={handRef}
@@ -1442,8 +1423,8 @@ function BoardScreen({ go, tasks, setTasks, session, onSessionBump, rewardToast,
                   }}>
                     Empty hand — draw from the deck above.
                   </div>
-                ) : picks.map((t, i) => {
-                  const pos = fanLayout(picks.length, i, handW);
+                ) : fanned.map((t, i) => {
+                  const pos = fanLayout(fanned.length, i, handW);
                   const on = focusId === t.id;
                   return (
                     <VerticalTaskCard
