@@ -9,6 +9,14 @@ Covers **July 5–10, 2026**. Combines:
 
 ---
 
+## 2026-07-25 — [Claude Code / Opus 5]
+- Redesign review of the live build (docs only, **no game code changed**): `docs/design/2026-07-25-opus5-redesign-review.md` — 6 mechanical + 8 aesthetic findings, ranked 12-ticket table, 3 evidence screenshots in `docs/design/screens/`
+- Measured against the real scheduler: **Fumes day Jul 25 = 69 bound cards / 103 effort** vs a budget of 3 (127 on flight day); Fumes/Steady/Full produce an identical bound hand; `taskPressure` pinned at 3 every day Jul 12→31; 79 of 180 tasks in FINAL CALL at once
+- Confirmed dead code: `buildMinimumSchedule` (never called), `branchOptions` / `nextTaskOnComplete` (never read — both sides of every keep/donate decision live in the deck)
+- Both fan renderers break at real card counts: apartment fan spans ~1351px on a 390px screen; Board hand clips its own tail behind `overflow: hidden`
+- FINISH_PLAN → Open next seeded with the three pre-move tickets only; the other nine are Eloisa's call
+- Session: `docs/sessions/2026-07-25-claude-opus5-redesign-review.md`
+
 ## 2026-07-19 — [Cursor / Grok 4.5]
 - World-truth code pass: manual-Done sticks (`manualDone`), set-dressing catalog drop, `living:tv` Roku split, personal laptop carry-on
 - Fresh-install bindings for `f_buyer_tv` / `f_remove_tv`; binding stub tests run under plain Node on Windows
