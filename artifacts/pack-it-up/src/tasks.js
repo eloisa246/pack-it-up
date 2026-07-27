@@ -67,6 +67,18 @@ export const REMOVED_TASK_IDS = new Set([
   "t_stomach", "t_nerves", "t_vet",
 ]);
 
+/**
+ * Canonical dates that supersede whatever a save carries. A saved dueDate
+ * normally wins (it's her Ledger edit), but these tasks are in
+ * LOCKED_DATE_TASK_IDS — she *cannot* correct them from the Ledger, so a stale
+ * date in an old save would be permanent. Use only when a real-world date moved.
+ *   m_ubox_receive: U-Box day moved Jul 27 -> Jul 29; this card was the one
+ *   straggler left behind when m_load1 / m_load_main / the calendar spine shifted.
+ */
+export const FORCE_TASK_DATES = {
+  m_ubox_receive: "2026-07-29",
+};
+
 /** Seeded tasks that moved lanes — force category on merge so old saves don't stick them in admin. */
 export const FORCE_TASK_CATEGORY = {
   a_pharmacy: "health",
@@ -271,7 +283,7 @@ export const INITIAL_TASKS = [
 
   base({ id: "m_load1", title: "U-Box day: load heavy / boring / low-theft first", category: "move", effort: 3, urgency: 3, due: "Jul 29", dueDate: "2026-07-29", exactDate: "2026-07-29", criticalPath: true, availableFrom: "2026-07-29", targetDate: "2026-07-29", latestDate: "2026-07-29", criticality: 3 }),
   base({ id: "m_load_main", title: "Main loading days", category: "move", effort: 3, urgency: 3, due: "Jul 29–30", dueDate: "2026-07-29", dueEnd: "2026-07-30", criticalPath: true, availableFrom: "2026-07-29", targetDate: "2026-07-29", latestDate: "2026-07-30", criticality: 3 }),
-  base({ id: "m_ubox_receive", title: "Receive and inspect U-Box", category: "move", effort: 1, urgency: 2, due: "Jul 27", dueDate: "2026-07-27", exactDate: "2026-07-27", availableFrom: "2026-07-27", targetDate: "2026-07-27", latestDate: "2026-07-27", criticality: 3 }),
+  base({ id: "m_ubox_receive", title: "Receive and inspect U-Box", category: "move", effort: 1, urgency: 2, due: "Jul 29", dueDate: "2026-07-29", exactDate: "2026-07-29", availableFrom: "2026-07-29", targetDate: "2026-07-29", latestDate: "2026-07-29", criticality: 3 }),
   base({ id: "m_ubox_photo_empty", title: "Photograph empty U-Box interior", category: "move", effort: 1, due: "Jul 29", dueDate: "2026-07-29", availableFrom: "2026-07-29", targetDate: "2026-07-29", latestDate: "2026-07-29", criticality: 2 }),
   base({ id: "m_load_late_value", title: "Load late-value storage items", category: "move", effort: 2, urgency: 2, due: "Jul 29", dueDate: "2026-07-29", dueEnd: "2026-07-30", availableFrom: "2026-07-29", targetDate: "2026-07-29", latestDate: "2026-07-30", criticality: 3 }),
   base({ id: "m_plane_bags", title: "Finish plane bags", category: "move", effort: 2, urgency: 2, due: "Jul 29", dueDate: "2026-07-29", dueEnd: "2026-07-30", availableFrom: "2026-07-27", targetDate: "2026-07-29", latestDate: "2026-07-30", criticality: 3 }),
@@ -485,12 +497,29 @@ export function taskPressure(tasks, date = new Date()) {
   return 0;
 }
 
+/**
+ * Stretchy's own travel chain — the cards that decide whether HE is ready to
+ * fly. The scratching-post and cat-tree keep-or-donate cards are filed under his
+ * lane, but they are furniture logistics, not his welfare. Because both sides of
+ * each decision stay open (nothing resolves a branch) and they are dated Jul
+ * 17–25, counting them pinned him at "stressed" for the rest of the month no
+ * matter how well his actual travel prep was going. Design intent was always
+ * "HIS travel chain + U-Box-week disruption only" — this makes the code match.
+ */
+const STRETCHY_TRAVEL_CHAIN = new Set([
+  "c_vet_book", "c_vet_attend", "c_vet_agenda", "c_cert", "c_vax_records", "c_records",
+  "c_meds_run", "c_med_test", "c_med_reaction", "c_carrier", "c_kit",
+  "c_final_doc_check", "c_departure",
+]);
+
 /** Stretchy reacts only to his own due chain plus mild U-Box disruption. */
 export function stretchyStress(tasks, date = new Date()) {
-  const openCat = tasks.filter((task) => isOpen(task) && task.category === "cat");
-  if (openCat.some((task) => isHardOverdue(task, date) || isDueSoon(task, date, 2))) return 2;
+  const openChain = tasks.filter((task) => (
+    isOpen(task) && task.category === "cat" && STRETCHY_TRAVEL_CHAIN.has(task.id)
+  ));
+  if (openChain.some((task) => isHardOverdue(task, date) || isDueSoon(task, date, 2))) return 2;
   const phase = currentPhase(date).id;
-  if (openCat.length && ["ubox-week", "load-days", "lock-night"].includes(phase)) return 1;
+  if (openChain.length && ["ubox-week", "load-days", "lock-night"].includes(phase)) return 1;
   return 0;
 }
 

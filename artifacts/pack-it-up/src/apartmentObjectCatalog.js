@@ -21,6 +21,10 @@ const PACKABLE_OBJECTS = {
     ["desk_clutter", "Desk Clutter"], ["office_chair", "Office Chair"],
     ["storage_bin", "Storage Tote"], ["wifi_router", "Wi-Fi Router"],
     ["cat_bed", "Stretchy's Bed"],
+    // Restored to the packing list Jul 25 (Eloisa): these are hers, not the
+    // landlord's — the Jul 19 set-dressing pass swept them up by mistake.
+    ["side_cabinet", "Side Cabinet"], ["sill_bottles", "Windowsill Bottles"],
+    ["waste_bin", "Wastebasket"],
   ],
   kitchen: [
     ["kettle", "Blue Kettle"], ["cutting_board", "Cutting Board"],

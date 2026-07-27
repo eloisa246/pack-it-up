@@ -2,7 +2,7 @@
    bumps can wipe or migrate. Audio volumes live in gameAudio.js
    (`pack-it-up-audio`); this file is packing / coins / tasks / room. */
 
-import { REMOVED_TASK_IDS, FORCE_TASK_CATEGORY, scheduleDatesForLedger } from "./tasks.js";
+import { REMOVED_TASK_IDS, FORCE_TASK_CATEGORY, FORCE_TASK_DATES, scheduleDatesForLedger } from "./tasks.js";
 import { normalizeTask } from "./schedule.js";
 
 const SAVE_KEY = "pack-it-up-save";
@@ -141,7 +141,14 @@ export function mergeTasks(initial, savedTasks) {
   const merged = initial
     .filter((t) => !REMOVED_TASK_IDS.has(t.id) && savedIds.has(t.id))
     .map((t) => {
-    const s = byId[t.id];
+    const saved = byId[t.id];
+    // A real-world date moved and this card is date-locked, so she can't fix it
+    // herself: drop the save's date fields entirely (omit, don't null — the
+    // merge below treats `undefined` as "use the code value" but `null` as a
+    // deliberate blank) and let the canonical date through.
+    const s = saved && FORCE_TASK_DATES[t.id]
+      ? (({ dueDate, dueEnd, targetDate, latestDate, exactDate, ...rest }) => rest)(saved)
+      : saved;
     if (!s || !ok.has(s.status)) return normalizeTask(t);
     const urgency = typeof s.urgency === "number" ? Math.min(3, Math.max(1, s.urgency)) : t.urgency;
     const effort = typeof s.effort === "number" ? Math.min(3, Math.max(1, s.effort)) : t.effort;
