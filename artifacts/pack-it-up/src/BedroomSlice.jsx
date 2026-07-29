@@ -1679,16 +1679,6 @@ const boxSlotCenter = (i) => {
   const [sx, sy] = BOX_SLOTS[Math.min(Math.max(i, 0), BOX_MAX - 1)];
   return { x: BOX_ORIGIN.x + (sx + BOX_W / 2) * CELL, y: BOX_ORIGIN.y + (sy + BOX_H / 2) * CELL };
 };
-/** Hit-test a pointer against a drawn box slot (cell coords inside the pile canvas). */
-const boxSlotAtCell = (cx, cy, count) => {
-  const n = Math.min(count, BOX_MAX);
-  for (let i = n - 1; i >= 0; i--) {
-    const [sx, sy] = BOX_SLOTS[i];
-    if (cx >= sx && cx < sx + BOX_W && cy >= sy && cy < sy + BOX_H) return i;
-  }
-  return -1;
-};
-
 function drawBoxes(ctx, count, openIdx = -1) {
   ctx.clearRect(0, 0, BOX_CW, BOX_CH);
   const midX = Math.floor(BOX_W / 2);
@@ -4344,31 +4334,46 @@ export default function PackItUp({ glowMode = "split", initialScreen = "apartmen
             both). packingHere covers the fly-in frame before state flips. */}
         {(rmBoxes > 0 || packingHere) && (
           <div
-            role={rm.id === room.id ? "button" : undefined}
-            aria-label={rm.id === room.id ? "Open a packed box" : undefined}
             style={{
               position: "absolute", left: BOX_ORIGIN.x, top: BOX_ORIGIN.y, zIndex: 60,
+              width: BOX_CW * CELL, height: BOX_CH * CELL,
               animation: "popIn 220ms ease-out",
-              cursor: rm.id === room.id && rmBoxes > 0 ? "pointer" : "default",
-            }}
-            onClick={(e) => {
-              if (rm.id !== room.id || rmBoxes <= 0) return;
-              e.stopPropagation();
-              closeStorage();
-              closeRadio();
-              setSelectedId(null);
-              const rect = e.currentTarget.getBoundingClientRect();
-              const cx = ((e.clientX - rect.left) / Math.max(1, rect.width)) * BOX_CW;
-              const cy = ((e.clientY - rect.top) / Math.max(1, rect.height)) * BOX_CH;
-              let hit = boxSlotAtCell(cx, cy, rmBoxes);
-              if (hit < 0) hit = Math.min(rmBoxes - 1, BOX_MAX - 1);
-              setBoxOpenSlot(hit);
-              setSelectedBoxItemKey(null);
+              // The pile CANVAS is 496x288 stage px — far bigger than the cartons
+              // drawn inside it, and it sits above furniture (z 60 vs 50). As one
+              // big click target it swallowed every tap in the whole foreground
+              // band: the living-room coffee table at (272,468) is entirely
+              // inside it and could not be selected at all once a single box
+              // existed. The old handler also opened a box when the tap had
+              // missed every carton. The wrapper is inert now; only the drawn
+              // cartons below take clicks, each exactly its own footprint.
+              pointerEvents: "none",
             }}
           >
             <div className={packingHere ? "boxReceiving" : ""} style={{ transformOrigin: "bottom center", pointerEvents: "none" }}>
               <PixelCanvas w={BOX_CW} h={BOX_CH} draw={(ctx) => drawBoxes(ctx, rmBoxes, openIdx)} redrawKey={`${rmBoxes}-${openIdx}`} />
             </div>
+            {rm.id === room.id && rmBoxes > 0
+              && BOX_SLOTS.slice(0, Math.min(rmBoxes, BOX_MAX)).map(([sx, sy], i) => (
+                <div
+                  key={`${sx}-${sy}`}
+                  role="button"
+                  aria-label={`Open packed box ${i + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeStorage();
+                    closeRadio();
+                    setSelectedId(null);
+                    setBoxOpenSlot(i);
+                    setSelectedBoxItemKey(null);
+                  }}
+                  style={{
+                    position: "absolute",
+                    left: sx * CELL, top: sy * CELL,
+                    width: BOX_W * CELL, height: BOX_H * CELL,
+                    pointerEvents: "auto", cursor: "pointer",
+                  }}
+                />
+              ))}
           </div>
         )}
 
