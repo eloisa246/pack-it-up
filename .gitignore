@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Vite
+.vite/
+vite.config.ts.timestamp-*
+
+# Vercel
+.vercel/
+
+# Environment / secrets
+# The OpenRouter API key belongs in the app's Settings UI, never in the repo.
+.env
+.env.*
+!.env.example
+*.pem
+
+# Backup archive — deliberately excluded.
+# The reassembled tarball is ~245 MB, well past GitHub's 100 MB per-file
+# limit; committing it would fail the push. Extract it and commit the
+# contents instead. See RESTORE.md.
+part-*
+project.tar.gz
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Editor
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
