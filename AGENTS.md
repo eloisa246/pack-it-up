@@ -1,170 +1,108 @@
 # Pack It Up — Agent Instructions
 
-> Read this before touching anything. It will save you from breaking the game.
+A cozy spatial packing puzzle about leaving home. Thirteen rooms of an
+apartment, each a set of real objects to fit into cardboard boxes — while
+Stretchy the cat climbs into whatever space you leave open.
 
-## AI team — who you are and what you may commit
+> **History:** until September 2026 this repo was a personal *productivity*
+> app for a real cross-country move (task deck, scheduler, AI receptionist,
+> multi-agent workflow). The move happened; the app was rebuilt from scratch
+> as an actual game. The old code, its process docs (`docs/ai-team/`,
+> `artifacts/agent_ledger.json`, `scripts/update-agent-ledger.js`) and its
+> design notes (`docs/design/`, `docs/move-spine/`, `docs/sessions/`) are an
+> archive. **None of their rules apply to the current game.**
 
-Full operating model: `docs/ai-team/README.md`. Hierarchy runs by harness, not model IQ.
+## Running it
 
-Before editing, read the live coordination ledger at `artifacts/agent_ledger.json`
-**and write your claim to it** — reading is not enough. Run
-`node scripts/update-agent-ledger.js <you> --status ACTIVE --working-on "…" --files … --systems … --risk …`
-before you touch code; if you don't claim, the rest of the team is blind to your
-work and will collide with it. Stop if another agent's locks overlap. Set your
-block to IDLE (`--clear-locks`) at close. Workflow: `docs/ai-team/agent-ledger.md`.
+pnpm only — npm is blocked by a preinstall guard.
 
-1. **Identify yourself first**: harness, model, permissions, task risk, and
-   budget state (check usage if your harness shows it, otherwise ask Eloisa).
-   Unknown? Ask: "Which harness/model am I right now?" Do not guess.
-2. **Commit authority**: only harness leads commit by default — Grok 4.5
-   (Cursor) and GPT-5.6 Sol (Codex). Luna: conditional, pre-approved scoped
-   tickets only. Composer never leads commits. Fable commits docs/design
-   only; repo code lands via Grok/Codex Sol.
-3. **Routing**: tiny edit → Composer · structural/risky → Grok or Codex Sol ·
-   thinking only → ChatGPT Sol · taste/voice/pixels → Fable/Opus ·
-   long-context grind → GLM (paid API, ask first).
-4. **Sub-agents**: delegation never raises authority — a sub-agent's work is
-   its lead's commit. See the delegation contract in `docs/ai-team/README.md`
-   and your harness playbook in `docs/ai-team/teams/`.
-5. **Session lifecycle**: start at `docs/ai-team/teams/<harness>/start-here.md`;
-   close per `docs/ai-team/end-here.md` (update FINISH_PLAN, new session
-   file in docs/sessions/, signed DEVLOG entry, merge to main).
-6. **Branches**: `main` is canon — never work on it directly. Cursor and
-   Codex work on their standing `cursor` / `codex` branches (pull main
-   first, every session). Claude merges its auto-created session branch
-   to main and deletes it. Merge = approval, done by the harness lead.
-7. **Eloisa is final taste authority.** Warn about risk or cost; never
-   overrule her taste.
-
-Do not spend expensive intelligence on moving furniture. Do not let cheap
-labor redesign the house. If you do not know who you are, ask. If the task
-is outside your role, hand it off. If the task can break the house, do not
-pretend it is moving the radio.
-
-### The nag mandate (Eloisa-ordered, Jul 11 — every agent, every session)
-
-This app exists to serve a real move (flight **Jul 31**; plan:
-`docs/move-spine/`). Agents can see the real plan and the real clock, so
-accountability is now a **team responsibility**: if Eloisa is deep in game
-dev while real-world tasks slip, say so — in session, **assertively**, and
-without being asked. During long-running processes (builds, agent runs,
-big merges), send her away from the screen and toward the move. Calibrate
-to her stated energy, but do not go silent to be polite.
-
-Approved register (hers):
-> "I see you still haven't sent any messages today. Please do that while this runs."
-> "No boxes packed still? I'm begging you."
-
-Nag about the critical path (sublet · vet · U-Box · packing · flight
-prep), not trivia. One nag per natural pause beats a lecture. This
-mandate outranks conversational politeness until the move completes.
-
-## What this is
-
-A personal pixel-art moving game built with React + HTML canvas. The player walks through rooms of an apartment and decides what to pack, sell, or donate. No backend. No database. No UI libraries. Just one large game file.
-
-## The only files that matter for the game
-
-```
-artifacts/pack-it-up/src/BedroomSlice.jsx   ← entire hub + game (~5,150 lines)
-artifacts/pack-it-up/src/Screens.jsx       ← full-screen overlays (Menu/Desk/Health/Storage/Ledger/Settings/etc.)
-artifacts/pack-it-up/src/contents.js       ← storage contents data (items inside cabinets/drawers)
-artifacts/pack-it-up/src/tasks.js          ← the REAL move plan: ~180 dated tasks + real job shortlist, seeded as INITIAL_TASKS (not sample data). Save/urgency logic in save.js + schedule.js
-artifacts/pack-it-up/src/schedule.js       ← urgency/criticality scoring, daily deal, task state machine
-artifacts/pack-it-up/src/save.js           ← localStorage save/load/migrate + import/restore (key: pack-it-up-save)
-artifacts/pack-it-up/src/main.tsx          ← 15-line entry point
-artifacts/pack-it-up/src/layout.json       ← furniture X/Y positions per room
-artifacts/pack-it-up/src/assets/Cat-Sheet.png ← cat sprite sheet
-artifacts/pack-it-up/src/dev/spritePreview.jsx ← dev tool only
+```bash
+pnpm install
+cd artifacts/pack-it-up
+PORT=5173 BASE_PATH=/ pnpm dev      # PORT and BASE_PATH are required locally
+pnpm test                           # engine + every room solvable + shapes in sync
 ```
 
-Audio is NOT in `src/` — all sound lives in `public/assets/audio/` (music · sfx/{cat,containers,ui} · code · docs). The sell chime is base64-inlined in code, not a file.
+On Vercel, `vite.config.ts` defaults `PORT`/`BASE_PATH` itself — don't set them
+there. `vercel.json` at the repo root drives the build; the project's Root
+Directory must be the repo root.
 
-Assets map (what's actually imported vs source clutter): see
-`artifacts/pack-it-up/src/assets/items/packitup_cropped_assets/ASSET_MAP.md`.
+## Layout
 
-Everything else at the root is monorepo config. Do not touch it.
-
-## BedroomSlice.jsx — where to look
-
-Line numbers below are approximate — the file grows as features land. Find your section by searching for the labels shown.
-
-| Lines | Content |
-|-------|---------|
-| 1–30 | Imports + stage size constants |
-| 30–60 | Color palette (`P` object) + canvas helpers (`r`, `dith`, `outlineRect`) |
-| 60–335 | Bedroom shell + sprites |
-| 335–545 | Office shell + sprites |
-| 545–775 | Bathroom shell + sprites |
-| 775–965 | Kitchen shell + sprites + objects |
-| 965–1165 | Dining room shell + sprites + objects |
-| 1165–1430 | Living room shell + sprites + objects + box stack |
-| 1430–1590 | ROOMS data model + ROOMS_ORDER + floor/ceiling helpers |
-| 1590–1650 | PixelCanvas component + CATEGORY_COLORS |
-| 1650–1885 | Stretchy the cat (sprite sheet config + AI + animation loop) |
-| 1885–2055 | LayoutEditor (dev tool, `?edit=1` only) |
-| 2055–2090 | Haptics + audio init |
-| 2091–3783 | PackItUp main component (state, storage feature, drawer glow, game logic, mobile UI, desktop UI) |
-
-`Screens.jsx` and `contents.js` are imported by BedroomSlice but kept as separate files (overlays + data, not game logic).
-
-## Hard rules
-
-1. **Game code goes in BedroomSlice.jsx** — do not create new game feature files
-2. **No Tailwind** — zero Tailwind classes, not installed
-3. **No UI component libraries** — no Radix, no shadcn, not installed. Draw UI with canvas or inline styles.
-4. **Do not import** react-query, wouter, framer-motion, recharts, zod — not installed
-5. **layout.json** = furniture positions. Edit it for layout, not BedroomSlice.jsx
-6. **Do not split BedroomSlice.jsx** — other work is in flight. Leave it as one file for now.
-7. **Scope rule (stated once, here):** game code stays inside `artifacts/pack-it-up/`. The only files any agent may edit outside it: `FINISH_PLAN.md`, `HANDOFF.md`, `DEVLOG.md`, `docs/sessions/` (new files only), and your own team's folder `docs/ai-team/teams/<harness>/`. Claude additionally maintains `docs/**`, `CLAUDE.md`, and this file's AI-team section. Everything else at root is monorepo infrastructure — leave it alone.
-
-## How sprites work
-
-Each sprite is a function that draws onto a tiny canvas using pixel operations:
-```js
-const r = (ctx, color, x, y, w=1, h=1) => { ctx.fillStyle = color; ctx.fillRect(x,y,w,h); }
 ```
-`CELL = 4` — one sprite pixel = 4 screen pixels. Sprites are drawn at low-res and CSS-scaled with `image-rendering: pixelated`.
+artifacts/pack-it-up/
+  src/main.tsx            mounts the game
+  src/game/
+    App.jsx               screens: title, rooms, play (HUD, cards, toasts), ending hand-off
+    Ending.jsx            moving day
+    play.js               one room: layout, input, rule feedback, hints, finish sequence
+    engine.js             pure rules + solver (shared with tools/ and tests/)
+    cat.js                Stretchy: animation table, wander/nap AI, sheet smoothing
+    draw.js               procedural art: rooms, cardboard boxes, badges, weight meter
+    audio.js              Web Audio sfx (sampled + synthesized), streamed music
+    assets.js             image loading
+    save.js               progress in localStorage (key pack-it-up/v2)
+    data/items.js         THE CATALOG — every item's sprite, size, weight, flags, memory
+    data/shapes.js        GENERATED from items.js — never edit by hand
+    data/levels.js        the 13 rooms
+    data/build.js         level → engine inputs (applies which rules are on)
+  src/assets/             Cat-Sheet.png, splash.png, items/…/normalized/*.png (218 sprites)
+  public/assets/audio/    music + sfx
+  tools/                  build-shapes, check-levels, difficulty, naive player, PNG decoder
+  tests/game.test.mjs
+  asset-sources/          unimported source art, reference only
+```
 
-## How rooms work
+## How the game works
 
-Each room is an entry in `ROOMS` (line 1432). It has:
-- `drawShell(ctx)` — draws the static background (walls, floor, windows)
-- `sprites` — object of `{ name: { w, h, draw(ctx) } }` entries
-- `objects` — array of `{ id, name, category, value, sprite }` entries
+- **Grid.** 1 cell ≈ 10 cm. An item's grid shape is derived from its sprite's
+  alpha silhouette at a hand-assigned `size` (cells along its longer side) —
+  see `tools/derive.mjs`. Thin diagonal sprites that collapse get a hand-drawn
+  `shape` override in `items.js`. **Overrides must match the art's aspect
+  ratio**, or the sprite renders tiny inside its footprint.
+- **Proportions are a design rule.** Sizes are honest relative to each other
+  and to Stretchy: his nap takes a 3×2 space — far bigger than his bowls, a bit
+  smaller than his 3×3 bag of kibble. Check a new item against those anchors.
+- **Rules** (turned on per room in `levels.js`): fit (hard), `weight` (box
+  capacity), `fragile` (fragile can't share an edge with weight-3 items). Weight
+  and fragile are *soft* in play — the player may break them, sees why, and
+  can't finish until they fix it. The solver treats all rules as hard.
+- **Stretchy** naps in any free 3×2 space (blocking it) on `cat: "boxes"` /
+  `"chaos"` rooms; tap to shoo. He only walks on open floor, never across an
+  open box. He's drawn at floor-item scale near the wall and box scale near the
+  boxes. The sheet is compacted to the rows in use and smoothed with 2× Scale2x
+  at load.
+- **Par / Pro.** `parBoxes` = fewest boxes that can hold the room. When a room
+  offers a spare box, packing into par boxes earns Pro.
+- **Hints** run the solver from the player's current state (fewest boxes
+  first). If the state is a dead end, they find the item that's in the way.
 
-`ROOMS_ORDER` (line 1511) controls the pan order left→right.
+## Changing content
 
-## Audio
+After editing `items.js`:
 
-Web Audio API only — no `<audio>` tags. The sell chime is a base64-inlined MP3 decoded once and played via AudioContext. Do not change this pattern; it's required for iOS + the hosted CSP.
+```bash
+node tools/build-shapes.mjs --show   # regenerate shapes.js and eyeball them
+```
 
-## Multi-harness note
+After editing items or rooms:
 
-This project is worked on from Replit, Claude.ai, Cursor, and ChatGPT/Codex.
-- **Always `git pull` before starting**
-- **Always commit when done**
-- Never force-push
+```bash
+node tools/check-levels.mjs          # every room solvable; par; a sample solution
+node tools/difficulty.mjs            # naive-player win rate — the real difficulty signal
+pnpm test
+```
 
-## Dev URLs
+Difficulty targets: the naive player (biggest item first, random legal spot)
+should win ~40% of a tutorial, 60–100% of an easy room, and ≤5% of a real
+puzzle. Rooms alternate hard and easy; easy rooms carry an optional Pro goal
+(naive Pro win ≈ 0%).
 
-- Game: `/`
-- Layout editor: `/?edit=1`
-- Sprite preview: `/?preview=bed`
+## Conventions
 
-## Known tech debt (do not fix unless asked)
-
-- BedroomSlice.jsx should eventually be split into modules — not yet
-
-Fixed (don't re-fix): action timers are cancelled on unmount via the `schedule()`
-registry in PackItUp — route any new game timers through it. Sale prices are
-clamped to ≥ 0. The cat writes its position straight to the DOM and only
-re-renders on sprite-frame changes.
-
-## Next planned work
-
-**Canonical plan (short + long):** [`FINISH_PLAN.md`](./FINISH_PLAN.md)  
-**Latest session handoff:** [`HANDOFF.md`](./HANDOFF.md)  
-**History:** [`DEVLOG.md`](./DEVLOG.md)
-
-Do not maintain a second todo list here.
+- Plain JS + React for screens; the play field is a single canvas. No UI
+  libraries, no Tailwind.
+- Every timer and animation runs off the `Play` frame loop — nothing leaks
+  across rooms.
+- `?debug` exposes `window.__play` for the headless-browser test driver.
+- Art stays pixel: backgrounds paint at 1/3 resolution and upscale unsmoothed.

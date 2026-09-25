@@ -1,6 +1,6 @@
 # Pack It Up — Dev Log
 
-> **Convention:** newest entries near the top, headers signed `## <date> — [<Harness> / <model>]` so we know who did what. Session detail lives in `docs/sessions/`.
+> **Convention:** newest entries near the top, headers signed `## <date> — [<Harness> / <model>]`. Entries before 2026-09-25 describe the retired productivity app.
 
 Covers **July 5–10, 2026**. Combines:
 - ChatGPT / design-session history (concept → art direction → assets)
@@ -8,6 +8,15 @@ Covers **July 5–10, 2026**. Combines:
 - Jul 9–10: audio/radio, save/session, Shirley landline
 
 ---
+
+## 2026-09-25 — [Claude Code / Opus 5.5]
+- **Rebuilt Pack It Up as a game.** The move is done; the productivity app (task deck, scheduler, receptionist, agent ledger) is retired and removed from `src/`. New game lives in `artifacts/pack-it-up/src/game/`
+- **Core idea:** a spatial packing puzzle where every item's grid shape comes from its own sprite silhouette (`tools/derive.mjs`, PNG decoded at build time). 191 items catalogued with real-world sizes (1 cell ≈ 10 cm)
+- **Rules:** rotate, multiple boxes, box weight limits, fragile-can't-touch-heavy; weight/fragile are soft (shown, must be fixed to finish)
+- **Stretchy:** wanders the open floor, naps in any free 3×2 box space (blocks it), tap to shoo; perspective-scaled; proportions set so he's far bigger than his bowls and a bit smaller than his kibble bag. Cat sheet compacted + smoothed with 2× Scale2x
+- **13 rooms**, each verified by an exact-cover solver (dead-space + weight + biggest-item-has-room pruning; fewest-boxes-first search). Difficulty tuned with a naive-player simulation; easy rooms carry optional Pro goals
+- **Juice:** ghost previews, cardboard thuds pitched by size, flaps + tape + PACKED stamp, packing-peanut confetti, memories on keepsakes, moving-day ending
+- Removed: old app code, its tests, dev editors, unused UI art. Docs rewritten (`AGENTS.md`, `CLAUDE.md`, `README.md`, `FINISH_PLAN.md`)
 
 ## 2026-07-25 — [Claude Code / Opus 5]
 - Redesign review of the live build (docs only, **no game code changed**): `docs/design/2026-07-25-opus5-redesign-review.md` — 6 mechanical + 8 aesthetic findings, ranked 12-ticket table, 3 evidence screenshots in `docs/design/screens/`
