@@ -9,6 +9,8 @@
 //   shape   hand-drawn override, rows of "#" and "." — used when a silhouette
 //           doesn't read well as a grid piece
 //   memory  a line shown the first time the item is packed
+//   love    hearts it's worth in keep-or-let-go rooms (default 3 with a
+//           memory, else 1; a level's own `love` map wins)
 //
 // Grid shapes are generated from these into shapes.js by
 // `node tools/build-shapes.mjs` — rerun it after editing this file.
@@ -197,6 +199,10 @@ export const ITEMS = {
   spool_red:     I("s3_r07_i02_red_thread_spool", "Thread", 1),
   pincushion:    I("s3_r07_i04_tomato_pincushion", "Pincushion", 1),
   buttons:       I("s3_r07_i07_buttons", "Buttons", 1),
+  pattern:       I("s3_r15_i04_rolled_print", "Sewing pattern", 3),
+  needles:       I("s3_r07_i03_needle_card", "Needles", 1),
+  seam_ripper:   I("s3_r07_i08_seam_ripper", "Seam ripper", 1),
+  sew_tape:      I("s3_r07_i06_measuring_tape", "Measuring tape", 1),
 
   // ── Stretchy ──
   feather_wand:  I("s4_r09_i01_feather_wand", "Feather wand", 4, 1, { shape: ["..##", "###."] }),
@@ -225,4 +231,5 @@ export const ITEMS = {
   drill:         I("s5_r03_i08_power_drill", "Drill", 2, 3),
   hammer:        I("s5_r03_i01_hammer", "Hammer", 2, 3, { shape: ["##", ".#", ".#"] }),
   tape_measure:  I("s5_r03_i05_tape_measure", "Tape measure", 1, 2),
+  pliers:        I("s5_r03_i03_pliers", "Pliers", 2, 2),
 };

@@ -223,6 +223,18 @@ button { font-family: inherit; }
   z-index: 5;
   pointer-events: none; /* never block a drag */
 }
+.seal-btn {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  transform: translateX(-50%);
+  z-index: 6;
+  white-space: nowrap;
+  animation: seal-in 0.3s ease-out;
+}
+.seal-btn:active { transform: translate(-50%, 3px); }
+@keyframes seal-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+
 .toast.warn { border-color: var(--stamp); box-shadow: 0 4px 0 var(--stamp); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -10px); } }
 
@@ -325,6 +337,7 @@ button { font-family: inherit; }
 .pro { margin: 0; font-size: 16px; }
 .pro.yes { color: #9a6a0a; font-weight: 700; }
 .pro.no { opacity: 0.7; }
+.donated { margin: 0 0 6px; font-size: 14px; opacity: 0.75; }
 .result-buttons { display: flex; gap: 10px; margin-top: 6px; }
 .result-buttons .btn { white-space: nowrap; }
 

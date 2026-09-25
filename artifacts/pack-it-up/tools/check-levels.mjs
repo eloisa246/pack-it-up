@@ -3,7 +3,7 @@
 //   node tools/check-levels.mjs closet     levels whose id contains "closet"
 import { LEVELS } from "../src/game/data/levels.js";
 import { levelItems, levelBoxes } from "../src/game/data/build.js";
-import { solve, solveAny, parBoxes, rotations, cellsAt } from "../src/game/engine.js";
+import { solve, solveAny, parBoxes, bestHaul, rotations, cellsAt, layersOf } from "../src/game/engine.js";
 
 const filter = process.argv[2];
 let failed = 0;
@@ -12,17 +12,25 @@ for (const [n, level] of LEVELS.entries()) {
   if (filter && !level.id.includes(filter)) continue;
   const items = levelItems(level);
   const boxes = levelBoxes(level);
-  const cap = boxes.reduce((s, b) => s + b.w * b.h, 0);
+  const cap = boxes.reduce((s, b) => s + b.w * b.h * layersOf(b), 0);
   const need = items.reduce((s, it) => s + it.shape.cells.length, 0);
+  const minValue = level.keep?.target || 0;
   const wt = items.reduce((s, it) => s + it.weight, 0);
   const wcap = boxes.every((b) => b.maxWeight != null) ? boxes.reduce((s, b) => s + b.maxWeight, 0) : null;
 
   const t0 = Date.now();
   // count solutions where that's cheap; always confirm solvability via the fast path
-  const counted = solve(boxes, items, { countTo: 300, maxNodes: 2e6 });
-  const res = counted.solutions.length ? counted : solveAny(boxes, items, { maxNodes: 8e6 });
+  const counted = solve(boxes, items, { countTo: 300, maxNodes: 2e6, minValue });
+  const res = counted.solutions.length ? counted : solveAny(boxes, items, { maxNodes: 8e6, minValue });
   const ms = Date.now() - t0;
-  const par = res.status === "solved" ? parBoxes(boxes, items) : null;
+  const par = res.status === "solved" && !level.keep ? parBoxes(boxes, items) : null;
+  let keepLine = "";
+  if (level.keep) {
+    const hl = bestHaul(boxes, items);
+    const total = items.reduce((s, it) => s + it.value, 0);
+    keepLine = `  keep: target ${level.keep.target} · best ${hl.value}${hl.exact ? "" : "?"} (level says ${level.keep.best}) · all ${total}`;
+    if (hl.value !== level.keep.best) failed++;
+  }
   let fixedRot = "";
   if (level.teach === "drag" || level.teach === "rotate") {
     const r0 = solve(boxes, items, { noRotate: true });
@@ -37,23 +45,31 @@ for (const [n, level] of LEVELS.entries()) {
   console.log(
     `    cells ${need}/${cap} (slack ${cap - need})  items ${items.length}` +
       (wcap != null ? `  weight ${wt}/${wcap}` : "") +
-      `  rules:[${(level.rules || []).join(",")}]  cat:${level.cat ? level.cat : "-"}`,
+      `  rules:[${(level.rules || []).join(",")}]  cat:${level.cat ? level.cat : "-"}` + keepLine,
   );
   if (res.solutions[0]) printSolution(boxes, items, res.solutions[0]);
 }
 
 function printSolution(boxes, items, sol) {
   const glyph = (i) => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[i];
-  const grids = boxes.map((b) => Array.from({ length: b.h }, () => Array(b.w).fill("·")));
+  // one panel per box layer; the top layer of a 2-layer box is printed after it, marked ^
+  const panels = [];
+  boxes.forEach((b, box) => {
+    for (let l = 0; l < layersOf(b); l++) panels.push({ box, l, w: b.w, g: Array.from({ length: b.h }, () => Array(b.w).fill("·")) });
+  });
   for (const [idx, p] of sol) {
-    for (const [x, y] of cellsAt(rotations(items[idx].shape)[p.rot], p.x, p.y)) grids[p.box][y][x] = glyph(idx);
+    const pan = panels.find((q) => q.box === p.box && q.l === (p.layer || 0));
+    for (const [x, y] of cellsAt(rotations(items[idx].shape)[p.rot], p.x, p.y)) pan.g[y][x] = glyph(idx);
   }
+  if (panels.some((q) => q.l > 0)) console.log("    " + panels.map((q) => (q.l ? "^" : " ").padEnd(q.w)).join("   "));
   const rows = Math.max(...boxes.map((b) => b.h));
   for (let y = 0; y < rows; y++) {
-    console.log("    " + grids.map((g, i) => (g[y] ? g[y].join("") : " ".repeat(boxes[i].w))).join("   "));
+    console.log("    " + panels.map((q) => (q.g[y] ? q.g[y].join("") : " ".repeat(q.w))).join("   "));
   }
+  const left = items.map((_, i) => i).filter((i) => !sol.has(i));
+  if (left.length) console.log("    left behind: " + left.map(glyph).join(""));
   console.log(
-    "    " + items.map((it, i) => `${glyph(i)}=${it.id}${it.weight >= 3 ? "!" : ""}${it.fragile ? "*" : ""}`).join(" "),
+    "    " + items.map((it, i) => `${glyph(i)}=${it.id}${it.weight >= 3 ? "!" : ""}${it.fragile ? "*" : ""}${it.optional ? "♥" + it.value : ""}`).join(" "),
   );
 }
 

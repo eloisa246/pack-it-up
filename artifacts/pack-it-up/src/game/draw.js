@@ -11,6 +11,7 @@ export const ROOMS = {
   bedroom:  { wall: "#e5c8bf", wall2: "#d9b4a8", trim: "#f6ece5", floorA: "#b98b5f", floorB: "#a67b51", floor: "planks", accent: "#8c4b54", light: "#ffe9d2", rug: "#c98f7a" },
   living:   { wall: "#c7d2b2", wall2: "#b5c19c", trim: "#f0eee0", floorA: "#a97c53", floorB: "#936946", floor: "planks", accent: "#5b7949", light: "#fbf3d5", rug: "#8a9a6e" },
   office:   { wall: "#b8c2d4", wall2: "#a4b0c5", trim: "#eceff4", floorA: "#9d7651", floorB: "#8a6646", floor: "planks", accent: "#40598a", light: "#eef3ff" },
+  hall:     { wall: "#d9cfa6", wall2: "#cbbf92", trim: "#f5f0de", floorA: "#8f6c4c", floorB: "#7d5c3f", floor: "planks", accent: "#6d5a8a", light: "#fff6dc", rug: "#7f6e9a" },
   dining:   { wall: "#e0b898", wall2: "#d4a585", trim: "#f7ebdf", floorA: "#a67751", floorB: "#8f6444", floor: "planks", accent: "#a0482f", light: "#fff0da", rug: "#b86b50" },
 };
 

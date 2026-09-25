@@ -1,12 +1,21 @@
-// The campaign. One level per corner of the apartment, in the order you'd
-// actually pack it. Every level is verified solvable by tools/check-levels.mjs.
+// The campaign. Every room adds exactly one new idea, in roughly the order
+// you'd pack an apartment, and the rooms get harder as they go. Every level
+// is verified solvable by tools/check-levels.mjs; tools/difficulty.mjs
+// measures how often a human-like simulated player finishes it.
 //
-//   teach   which mechanic this level introduces (drives the intro card)
+//   teach   the idea this room introduces (drives the intro card)
 //   rules   "weight" turns on box weight limits; "fragile" turns on the
-//           fragile/heavy adjacency rule. Off = those item flags are ignored.
+//           fragile/heavy rule. Off = those item flags are ignored.
 //   cat     0 · "roam" (wanders, ignores boxes) · "boxes" (naps in open space)
 //           · "chaos" (naps often, and returns fast)
-//   boxes   w×h grid, optional maxWeight, optional label printed on the box
+//   mood    Stretchy wants attention: his mood drains, and when it runs out
+//           he acts out. Pet him or toss him a toy to keep him happy.
+//   boxes   w×h grid, optional maxWeight, optional layers (1 or 2), label
+//   keep    keep-or-let-go: not everything fits. { target, best } in hearts;
+//           `love` overrides what each item is worth here.
+
+const W = ["weight"];
+const WF = ["weight", "fragile"];
 
 export const LEVELS = [
   {
@@ -33,7 +42,7 @@ export const LEVELS = [
     id: "pantry",
     room: "kitchen",
     title: "The Pantry",
-    intro: "More food than you remember buying. Two boxes this time.",
+    intro: "More food than you remember buying. More than one box this time.",
     teach: "boxes",
     cat: "roam",
     boxes: [{ w: 4, h: 3, label: "PANTRY" }, { w: 4, h: 3, label: "PANTRY" }, { w: 3, h: 3, label: "PANTRY" }],
@@ -43,11 +52,11 @@ export const LEVELS = [
     id: "junk-drawer",
     room: "kitchen",
     title: "The Junk Drawer",
-    intro: "Every home has one. Nobody knows what half of it is for.",
+    intro: "Every home has one. Two flashlights, and neither of them works.",
     teach: "par",
     cat: "roam",
     boxes: [{ w: 4, h: 3, label: "MISC" }, { w: 4, h: 3, label: "MISC" }, { w: 3, h: 3, label: "MISC" }],
-    items: ["flashlight", "scissors", "screwdriver", "gloves", "trash_bags", "spray", "batteries", "tape_roll", "rubber_bands", "paper_clips", "pen", "sponge"],
+    items: ["flashlight", "flashlight", "scissors", "gloves", "trash_bags", "screwdriver", "spray", "batteries", "tape_roll", "rubber_bands"],
   },
   {
     id: "closet",
@@ -60,14 +69,14 @@ export const LEVELS = [
     items: ["long_coat", "peacoat", "dress", "boots", "jeans"],
   },
   {
-    id: "bags",
+    id: "sewing-tin",
     room: "bedroom",
-    title: "Bags & Small Things",
-    intro: "Bags inside boxes. Small things in the gaps.",
-    teach: null,
-    cat: "boxes",
-    boxes: [{ w: 4, h: 4, label: "BEDROOM" }, { w: 4, h: 4, label: "BEDROOM" }, { w: 3, h: 3, label: "BEDROOM" }],
-    items: ["tote", "satchel", "sweater", "belt", "pouch", "zip_case", "eyeshadow", "ring", "necklace", "lipstick", "perfume"],
+    title: "The Sewing Tin",
+    intro: "It all came out of this tin, so it all goes back in. Somehow.",
+    teach: "tight",
+    cat: "roam",
+    boxes: [{ w: 5, h: 4, label: "SEWING" }],
+    items: ["fabric_roll", "scissors", "scissors", "pattern", "spool_blue", "spool_red", "pincushion"],
   },
   {
     id: "bookshelf",
@@ -75,29 +84,35 @@ export const LEVELS = [
     title: "The Bookshelf",
     intro: "Heavy things go in small boxes. Every mover says so.",
     teach: "weight",
-    rules: ["weight"],
+    rules: W,
     cat: "boxes",
     boxes: [
       { w: 4, h: 2, maxWeight: 6, label: "BOOKS" },
       { w: 4, h: 2, maxWeight: 6, label: "BOOKS" },
       { w: 5, h: 4, maxWeight: 4, label: "LIGHT" },
     ],
-    items: ["book_nature", "book_flowers", "book_humans", "green_books", "prints", "rolled_print", "fabric_floral"],
+    items: ["book_nature", "book_flowers", "book_humans", "clipboard", "certificate", "candle", "mail", "tapers", "fabric_floral"],
   },
   {
-    id: "desk",
-    room: "office",
-    title: "The Desk",
-    intro: "Work stuff. Some of it's heavier than it looks.",
-    teach: null,
-    rules: ["weight"],
+    id: "toolbox",
+    room: "hall",
+    title: "The Toolbox",
+    intro: "A deep box. Fill the bottom, then keep going.",
+    teach: "layers",
     cat: "boxes",
-    boxes: [
-      { w: 4, h: 4, maxWeight: 8, label: "OFFICE" },
-      { w: 4, h: 4, maxWeight: 8, label: "OFFICE" },
-      { w: 3, h: 3, maxWeight: 6, label: "OFFICE" },
-    ],
-    items: ["laptop", "router", "charger", "tablet", "folders", "stapler", "tape_disp", "upright_books", "passport", "earbuds", "sticky", "pen_cup", "notebook", "mail"],
+    boxes: [{ w: 4, h: 3, layers: 2, label: "TOOLS" }],
+    items: ["drill", "hammer", "flashlight", "pliers", "tape_measure", "gloves", "tape_roll", "trash_bags"],
+  },
+  {
+    id: "bags",
+    room: "bedroom",
+    title: "Bags & Small Things",
+    intro: "Bags inside boxes. Small things in the gaps. Stretchy is feeling ignored.",
+    teach: "mood",
+    cat: "boxes",
+    mood: true,
+    boxes: [{ w: 4, h: 4, label: "BEDROOM" }, { w: 5, h: 3, label: "BEDROOM" }],
+    items: ["tote", "satchel", "sweater", "belt", "pouch", "scarf", "ring", "lipstick", "necklace"],
   },
   {
     id: "cookware",
@@ -105,59 +120,93 @@ export const LEVELS = [
     title: "Pots & Plates",
     intro: "Cast iron and china. Keep them apart, or something breaks.",
     teach: "fragile",
-    rules: ["weight", "fragile"],
+    rules: WF,
     cat: "boxes",
+    mood: true,
     boxes: [
       { w: 5, h: 4, maxWeight: 10, label: "KITCHEN" },
       { w: 4, h: 4, maxWeight: 10, label: "KITCHEN" },
     ],
-    items: ["skillet", "stock_pot", "saucepan", "plate", "bowl", "mug", "mug", "plate_stack", "baking_sheet", "pot_lid"],
+    items: ["skillet", "stock_pot", "plate", "bowl", "plate_stack", "wooden_spoon", "whisk", "tongs", "mug"],
+  },
+  {
+    id: "desk",
+    room: "office",
+    title: "The Desk",
+    intro: "Two deep boxes. Everything you stack still counts toward the weight.",
+    teach: "stackweight",
+    rules: W,
+    cat: "boxes",
+    mood: true,
+    boxes: [
+      { w: 4, h: 3, layers: 2, maxWeight: 10, label: "OFFICE" },
+      { w: 4, h: 3, layers: 2, maxWeight: 10, label: "OFFICE" },
+    ],
+    items: ["laptop", "router", "upright_books", "earbuds", "charger", "envelope", "tape_disp", "tablet", "stapler", "certificate", "mail", "binder_clip", "sticky"],
   },
   {
     id: "bar-cart",
     room: "dining",
     title: "The Bar Cart",
-    intro: "Bottles are heavy. Glasses are not brave. Use the little things as padding.",
-    teach: null,
-    rules: ["weight", "fragile"],
+    intro: "Bottles are heavy. Glasses are not brave. Glass can ride on top — nothing heavy can.",
+    teach: "crush",
+    rules: WF,
     cat: "boxes",
-    boxes: [{ w: 5, h: 4, maxWeight: 18, label: "FRAGILE" }],
-    items: ["wine", "wine", "shaker", "wine_glass", "wine_glass", "flute", "rocks_glass", "shot_glass", "jigger", "corkscrew", "opener", "matchbox"],
+    mood: true,
+    boxes: [{ w: 5, h: 3, layers: 2, maxWeight: 20, label: "FRAGILE" }],
+    items: ["wine", "wine", "liquor", "wine_glass", "wine_glass", "flute", "flute", "martini", "rocks_glass", "rocks_glass", "shot_glass", "opener", "tapers"],
+  },
+  {
+    id: "carry-on",
+    room: "hall",
+    title: "The Carry-On",
+    intro: "The first night's bag. It won't all fit — bring what you'll miss most.",
+    teach: "keep",
+    cat: "boxes",
+    mood: true,
+    boxes: [{ w: 5, h: 4, label: "CARRY-ON" }],
+    items: ["laptop", "journal", "toiletry_bag", "charger", "tablet", "sweater", "jeans", "shirt", "neck_pillow", "boots", "passport", "earbuds", "dress"],
+    love: { laptop: 4, journal: 3, toiletry_bag: 2, charger: 2, tablet: 3, sweater: 2, jeans: 2, shirt: 2, neck_pillow: 1, boots: 3, passport: 2, earbuds: 1, dress: 3 },
+    keep: { target: 16, best: 17 },
   },
   {
     id: "music",
     room: "living",
     title: "The Music Corner",
     intro: "The awkward stuff. There's no right way to box a guitar.",
-    teach: null,
-    rules: ["weight", "fragile"],
+    teach: "awkward",
+    rules: WF,
     cat: "boxes",
+    mood: true,
     boxes: [
       { w: 6, h: 4, maxWeight: 9, label: "GUITAR" },
       { w: 5, h: 4, maxWeight: 9, label: "LIVING RM" },
-      { w: 3, h: 3, maxWeight: 5, label: "LIVING RM" },
     ],
-    items: ["guitar", "amp", "console", "ginger_jar", "cable", "controller", "tuner", "picks", "dice", "cards", "knight"],
+    items: ["guitar", "amp", "console", "rolled_print", "controller", "cable", "bud_vase", "tapers"],
   },
   {
     id: "keepsakes",
     room: "bedroom",
     title: "The Keepsake Shelf",
-    intro: "Take your time with this one.",
-    teach: null,
-    rules: ["weight", "fragile"],
+    intro: "One deep box for everything that matters. Take your time with this one.",
+    teach: "keepsakes",
+    rules: WF,
     cat: "roam",
-    boxes: [{ w: 6, h: 4, maxWeight: 10, label: "KEEP" }],
-    items: ["journal", "letters", "ticket", "keepsake_box", "framed_cat", "shell_dish", "book_humans", "candle"],
+    mood: true,
+    boxes: [{ w: 5, h: 3, layers: 2, maxWeight: 10, label: "KEEP" }],
+    items: ["journal", "letters", "ticket", "keepsake_box", "framed_cat", "shell_dish", "ring", "certificate", "book_humans", "quilt", "vase_tall_bw", "botanical", "candle", "puzzle_box", "prints", "green_books"],
+    love: { journal: 4, letters: 3, ticket: 2, keepsake_box: 4, framed_cat: 4, shell_dish: 3, ring: 3, certificate: 2, book_humans: 2, quilt: 5, vase_tall_bw: 2, botanical: 2, candle: 1, puzzle_box: 1, prints: 2, green_books: 1 },
+    keep: { target: 22, best: 27 },
   },
   {
     id: "stretchy",
     room: "kitchen",
     title: "Stretchy's Things",
     intro: "Last room. His things. He is not going to make this easy.",
-    teach: null,
-    rules: ["weight", "fragile"],
+    teach: "finale",
+    rules: WF,
     cat: "chaos",
+    mood: true,
     boxes: [
       { w: 6, h: 4, maxWeight: 9, label: "STRETCHY" },
       { w: 6, h: 4, maxWeight: 9, label: "STRETCHY" },

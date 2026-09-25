@@ -1,8 +1,8 @@
 // One room of the game: layout, input, rules feedback, the cat, and the
 // seal-and-stamp finish. Pure canvas; React only wraps it with the HUD.
 import {
-  makeBoard, put, lift, fits, rotations, boxWeight, fragileConflicts,
-  overweightBoxes, isSolved, solve, solveAny, parBoxes, cellsAt, HEAVY,
+  makeBoard, put, lift, fits, rotations, boxWeight, fragileConflicts, overweightBoxes,
+  isSolved, solveAny, parBoxes, cellsAt, heightAt, itemsOnTop, layersOf, packedValue, valueOf, HEAVY,
 } from "./engine.js";
 import { levelItems, levelBoxes } from "./data/build.js";
 import {
@@ -30,8 +30,10 @@ export class Play {
     this.rng = rng;
     this.weightOn = this.boxes.some((b) => b.maxWeight != null);
     this.fragileOn = !!level.rules?.includes("fragile");
-    this.par = parBoxes(this.boxes, this.items) ?? this.boxes.length;
-    this.solution = solveAny(this.boxes, this.items).solutions[0] || null;
+    // keep-or-let-go rooms: items are optional, the room needs a value target
+    this.keep = level.keep || null;
+    this.par = this.keep ? this.boxes.length : parBoxes(this.boxes, this.items) ?? this.boxes.length;
+    this.solution = solveAny(this.boxes, this.items, { minValue: this.keep?.target || 0 }).solutions[0] || null;
 
     this.vis = this.items.map((it, i) => ({
       rot: 0, x: 0, y: 0, s: 20, tx: 0, ty: 0, ts: 20, ang: 0, tAng: 0,
@@ -91,7 +93,8 @@ export class Play {
     this.H = H;
 
     const top = 64 + cssVar("--sat");
-    const bottom = 16 + cssVar("--sab");
+    // keep rooms reserve a strip at the bottom for the "Seal the boxes" button
+    const bottom = (this.keep ? 70 : 16) + cssVar("--sab");
     const m = 12;
     const portrait = H >= W * 0.9;
     this.portrait = portrait;
@@ -365,9 +368,12 @@ export class Play {
       const g = this.geo[b];
       const cx = Math.floor((x - g.x) / this.C), cy = Math.floor((y - g.y) / this.C);
       if (cx >= 0 && cy >= 0 && cx < g.w && cy < g.h) {
-        const v = this.board.grids[b][cy * g.w + cx];
-        if (v >= 0) return { kind: "item", i: v };
-        if (v === -2 && this.cat) return { kind: "cat" };
+        const A = g.w * g.h;
+        for (let l = layersOf(this.boxes[b]) - 1; l >= 0; l--) {
+          const v = this.board.grids[b][l * A + cy * g.w + cx];
+          if (v >= 0) return { kind: "item", i: v };
+          if (v === -2 && this.cat) return { kind: "cat" };
+        }
       }
     }
     // floor items: generous rectangle, topmost first
@@ -393,6 +399,11 @@ export class Play {
     const i = pr.hit.i;
     const v = this.vis[i];
     const fromBox = v.where === "box";
+    if (fromBox && itemsOnTop(this.board, i).length) {
+      this.press = null;
+      this.refuseUnder(i);
+      return;
+    }
     if (fromBox) {
       this.snapshot();
       lift(this.board, i);
@@ -409,6 +420,13 @@ export class Play {
     if (this.hintFx?.i !== i) this.hintFx = null;
     this.layoutTray();
     this.emitState();
+  }
+
+  refuseUnder(i) {
+    this.vis[i].wob = 1;
+    for (const j of itemsOnTop(this.board, i)) this.vis[j].wob = 0.6;
+    audio.bonk();
+    this.toastOnce("under", "Something's resting on it. Take that off first.");
   }
 
   rotateDragged() {
@@ -437,6 +455,7 @@ export class Play {
       return;
     }
     if (v.where !== "box") return;
+    if (itemsOnTop(this.board, i).length) return this.refuseUnder(i);
     const p = this.board.place.get(i);
     const from = rotations(this.items[i].shape)[p.rot];
     const to = rotations(this.items[i].shape)[(p.rot + 1) % 4];
@@ -444,9 +463,9 @@ export class Play {
     const bx = Math.round(cx - to.w / 2), by = Math.round(cy - to.h / 2);
     const tries = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
     for (const [dx, dy] of tries) {
-      if (fits(this.board, i, p.box, bx + dx, by + dy, (p.rot + 1) % 4)) {
+      if (fits(this.board, i, p.box, bx + dx, by + dy, (p.rot + 1) % 4, p.layer)) {
         this.snapshot();
-        put(this.board, i, p.box, bx + dx, by + dy, (p.rot + 1) % 4);
+        put(this.board, i, p.box, bx + dx, by + dy, (p.rot + 1) % 4, p.layer);
         v.rot = (p.rot + 1) % 4;
         v.tAng += 90;
         const g = this.geo[p.box];
@@ -473,8 +492,9 @@ export class Play {
       // picking up from a box already saved an undo step; from the floor, save one now
       if (!d.fromBox) this.snapshot();
       if (this.hintFx?.i === i) this.hintFx = null;
-      put(this.board, i, snap.box, snap.x, snap.y, v.rot);
+      put(this.board, i, snap.box, snap.x, snap.y, v.rot, snap.layer);
       v.where = "box";
+      v.layer = snap.layer;
       const g = this.geo[snap.box];
       v.tx = g.x + snap.x * this.C;
       v.ty = g.y + snap.y * this.C;
@@ -491,6 +511,7 @@ export class Play {
       if (snap && !snap.ok) {
         audio.bonk();
         if (this.cat?.napping && this.cellsHitCat(i, snap)) this.toastOnce("cat", "Stretchy's in the way. Tap him to shoo him out.");
+        else if (snap.uneven) this.toastOnce("uneven", "Not level. To stack it, everything underneath has to be the same height.");
       }
       v.where = "tray";
       this.layoutTray();
@@ -500,8 +521,12 @@ export class Play {
 
   cellsHitCat(i, snap) {
     const sh = rotations(this.items[i].shape)[this.vis[i].rot];
-    const g = this.geo[snap.box];
-    return cellsAt(sh, snap.x, snap.y).some(([x, y]) => x >= 0 && y >= 0 && x < g.w && y < g.h && this.board.grids[snap.box][y * g.w + x] === -2);
+    const g = this.geo[snap.box], A = g.w * g.h, grid = this.board.grids[snap.box];
+    return cellsAt(sh, snap.x, snap.y).some(([x, y]) => {
+      if (x < 0 || y < 0 || x >= g.w || y >= g.h) return false;
+      for (let l = 0; l < layersOf(this.boxes[snap.box]); l++) if (grid[l * A + y * g.w + x] === -2) return true;
+      return false;
+    });
   }
 
   afterChange(i, box) {
@@ -521,7 +546,8 @@ export class Play {
       if (bad.length) {
         audio.tink();
         for (const c of bad) this.vis[c.fragile].wob = 1;
-        this.toastOnce("fragile", "Fragile! Glass can't touch heavy things. Pad it with something light.");
+        if (bad.some((c) => c.kind === "crush")) this.toastOnce("crush", "Crunch. Nothing heavy on top of something fragile.");
+        else this.toastOnce("fragile", "Fragile! Glass can't touch heavy things. Pad it with something light.");
       }
     }
     // a memory, the first time it goes in a box
@@ -534,7 +560,16 @@ export class Play {
       this.emit("memory", { name: it.name, text: it.memory });
     }
     this.emitState();
-    if (isSolved(this.board)) this.finish();
+    if (this.keep) {
+      // with everything packed there's nothing left to decide
+      if (this.board.place.size === this.items.length && isSolved(this.board, this.keep)) this.finish();
+      else if (isSolved(this.board, this.keep)) this.toastOnce("seal", "That's enough to move with. Seal the boxes whenever you're ready, or keep packing for more.");
+    } else if (isSolved(this.board)) this.finish();
+  }
+
+  /** Keep-or-let-go rooms: finish now; whatever's left on the floor is donated. */
+  seal() {
+    if (!this.done && this.keep && isSolved(this.board, this.keep)) this.finish();
   }
 
   undo() {
@@ -573,10 +608,11 @@ export class Play {
     });
     this.vis.forEach((v) => (v.where = "tray"));
     for (const [i, p] of s.place) {
-      put(this.board, i, p.box, p.x, p.y, p.rot);
+      put(this.board, i, p.box, p.x, p.y, p.rot, p.layer || 0);
       const v = this.vis[i];
       const g = this.geo[p.box];
       v.where = "box";
+      v.layer = p.layer || 0;
       v.tx = g.x + p.x * this.C;
       v.ty = g.y + p.y * this.C;
       v.ts = this.C;
@@ -598,8 +634,14 @@ export class Play {
       this.emit("toast", { text: frag.length ? "Something fragile is touching something heavy." : "That box is too heavy. Move something out.", kind: "hint" });
       return;
     }
+    if (this.keep && isSolved(this.board, this.keep)) {
+      this.emit("toast", { text: "You've kept enough. Seal the boxes, or try to fit more hearts.", kind: "hint" });
+      if (packedValue(this.board) >= (this.keep.best ?? Infinity)) return;
+    }
     const fixed = new Map(this.board.place);
-    const res = solveAny(this.boxes, this.items, { fixed, maxNodes: 900000 });
+    const minValue = this.keep ? Math.max(this.keep.target, packedValue(this.board) + 1) : 0;
+    let res = solveAny(this.boxes, this.items, { fixed, maxNodes: 900000, minValue });
+    if (this.keep && res.status !== "solved") res = solveAny(this.boxes, this.items, { fixed, maxNodes: 600000, minValue: this.keep.target });
     if (res.status === "solved") {
       const sol = res.solutions[0];
       const free = [...sol.keys()].filter((i) => !fixed.has(i));
@@ -609,7 +651,8 @@ export class Play {
       const p = sol.get(i);
       if (this.cat?.spot && p.box === this.cat.spot.box) {
         const sh = rotations(this.items[i].shape)[p.rot];
-        if (cellsAt(sh, p.x, p.y).some(([x, y]) => this.board.grids[p.box][y * this.boxes[p.box].w + x] === -2)) {
+        const b = this.boxes[p.box], off = (p.layer || 0) * b.w * b.h;
+        if (cellsAt(sh, p.x, p.y).some(([x, y]) => this.board.grids[p.box][off + y * b.w + x] === -2)) {
           this.emit("toast", { text: "Stretchy is sleeping where that goes. Tap him.", kind: "hint" });
         }
       }
@@ -620,7 +663,7 @@ export class Play {
     for (const j of placed) {
       const f2 = new Map(fixed);
       f2.delete(j);
-      if (solveAny(this.boxes, this.items, { fixed: f2, maxNodes: 150000 }).status === "solved") {
+      if (solveAny(this.boxes, this.items, { fixed: f2, maxNodes: 150000, minValue: this.keep?.target || 0 }).status === "solved") {
         this.hintFx = { kind: "move", i: j, t: 0 };
         this.emit("toast", { text: "This one's in the way. Try it somewhere else.", kind: "hint" });
         return;
@@ -651,6 +694,8 @@ export class Play {
       used,
       boxes: this.boxes.length,
       par: this.par,
+      keep: this.keep ? { value: packedValue(this.board), target: this.keep.target, best: this.keep.best } : null,
+      canSeal: !!this.keep && !this.done && isSolved(this.board, this.keep),
     });
   }
 
@@ -669,11 +714,21 @@ export class Play {
       return s;
     });
     const used = usedSet.size;
+    const value = packedValue(this.board);
+    // anything still on the floor goes to the donation pile
+    this.vis.forEach((v, i) => {
+      if (v.where !== "tray") return;
+      v.where = "donated";
+      v.tx = this.W + 80;
+      v.ty = this.H * 0.55 + this.rng() * 60;
+      v.delay = 0.1 + this.rng() * 0.4;
+    });
     this.stats = {
       boxes: used,
       total: this.boxes.length,
       par: this.par,
-      pro: this.par < this.boxes.length && used <= this.par,
+      keep: this.keep ? { value, target: this.keep.target, best: this.keep.best, donated: this.items.length - this.board.place.size } : null,
+      pro: this.keep ? value >= this.keep.best : this.par < this.boxes.length && used <= this.par,
       ms: performance.now() - this.startTime,
       moves: this.moves,
       hints: this.hints,
@@ -763,13 +818,16 @@ export class Play {
     const out = [];
     if (this.done) return out;
     this.geo.forEach((g, b) => {
-      const grid = this.board.grids[b];
-      const free = (x, y) => grid[y * g.w + x] === -1;
+      const grid = this.board.grids[b], A = g.w * g.h, L = layersOf(this.boxes[b]);
+      // a flat surface: all empty floor, or (in a two-layer box) all tops of things
+      const all = (x, y, test) => {
+        for (let dy = 0; dy < CAT_H; dy++) for (let dx = 0; dx < CAT_W; dx++) if (!test((y + dy) * g.w + x + dx)) return false;
+        return true;
+      };
       for (let y = 0; y + CAT_H <= g.h; y++)
         for (let x = 0; x + CAT_W <= g.w; x++) {
-          let ok = true;
-          for (let dy = 0; dy < CAT_H && ok; dy++) for (let dx = 0; dx < CAT_W && ok; dx++) ok = free(x + dx, y + dy);
-          if (ok) out.push({ box: b, x, y, ...this.spotGeo(b, x, y, g) });
+          if (all(x, y, (k) => grid[k] === -1)) out.push({ box: b, x, y, layer: 0, ...this.spotGeo(b, x, y, g) });
+          else if (L > 1 && all(x, y, (k) => grid[k] >= 0 && grid[A + k] === -1)) out.push({ box: b, x, y, layer: 1, ...this.spotGeo(b, x, y, g) });
         }
     });
     return out;
@@ -779,9 +837,10 @@ export class Play {
     if (!s) return;
     const g = this.geo[s.box];
     const grid = this.board.grids[s.box];
+    const off = (s.layer || 0) * g.w * g.h;
     for (let dy = 0; dy < CAT_H; dy++)
       for (let dx = 0; dx < CAT_W; dx++) {
-        const k = (s.y + dy) * g.w + s.x + dx;
+        const k = off + (s.y + dy) * g.w + s.x + dx;
         if (on && grid[k] === -1) grid[k] = -2;
         else if (!on && grid[k] === -2) grid[k] = -1;
       }
@@ -863,6 +922,7 @@ export class Play {
       v.ang += (v.tAng - v.ang) * (1 - Math.exp(-dt * 20));
       v.squash = Math.max(0, v.squash - dt * 5);
       v.wob = Math.max(0, v.wob - dt * 2.2);
+      if (v.where === "donated") v.alpha = Math.max(0, v.alpha - dt * 0.8);
     });
     this.boxFx.forEach((f) => {
       f.shake = Math.max(0, f.shake - dt * 2.5);
@@ -929,28 +989,55 @@ export class Play {
         if (dist <= 0.9) cands.push({ x, y, dist });
       }
     cands.sort((a, b) => a.dist - b.dist);
+    let uneven = false;
     for (const c of cands) {
-      if (fits(this.board, i, best.b, c.x, c.y, v.rot)) {
-        return { box: best.b, x: c.x, y: c.y, ok: true, soft: this.softCheck(i, best.b, c.x, c.y, v.rot) };
+      const layer = this.levelFor(best.b, sh, c.x, c.y);
+      if (layer === -1) uneven = true;
+      if (layer >= 0 && fits(this.board, i, best.b, c.x, c.y, v.rot, layer)) {
+        return { box: best.b, x: c.x, y: c.y, layer, ok: true, soft: this.softCheck(i, best.b, c.x, c.y, v.rot, layer) };
       }
     }
-    return { box: best.b, x: best.gx, y: best.gy, ok: false };
+    const layer = Math.max(0, this.levelFor(best.b, sh, best.gx, best.gy));
+    return { box: best.b, x: best.gx, y: best.gy, layer, ok: false, uneven };
+  }
+
+  /**
+   * Which layer a shape would rest on here: 0 on the floor of the box, 1 on
+   * top of things (two-layer boxes). -1 if the surface isn't level, -2 if it
+   * doesn't fit inside the box at all.
+   */
+  levelFor(box, sh, x, y) {
+    const b = this.boxes[box];
+    let h = null;
+    for (const [cx, cy] of cellsAt(sh, x, y)) {
+      if (cx < 0 || cy < 0 || cx >= b.w || cy >= b.h) return -2;
+      const hh = heightAt(this.board, box, cx, cy);
+      if (h === null) h = hh;
+      else if (hh !== h) return -1;
+    }
+    return h < layersOf(b) ? h : -2;
   }
 
   /** What would go wrong (but still be allowed) if item i went here. */
-  softCheck(i, box, x, y, rot) {
+  softCheck(i, box, x, y, rot, layer = 0) {
     const it = this.items[i];
     const out = { heavy: false, touch: [] };
     const b = this.boxes[box];
     if (b.maxWeight != null) out.heavy = boxWeight(this.board, box) + it.weight > b.maxWeight;
     if (this.fragileOn && (it.fragile || it.weight >= HEAVY)) {
       const g = this.board.grids[box];
+      const A = b.w * b.h, off = layer * A;
       const sh = rotations(it.shape)[rot];
+      if (layer > 0 && it.weight >= HEAVY)
+        for (const [cx, cy] of cellsAt(sh, x, y)) {
+          const u = g[off - A + cy * b.w + cx];
+          if (u >= 0 && this.items[u].fragile && !out.touch.includes(u)) out.touch.push(u);
+        }
       for (const [cx, cy] of cellsAt(sh, x, y))
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= b.w || ny >= b.h) continue;
-          const o = g[ny * b.w + nx];
+          const o = g[off + ny * b.w + nx];
           if (o < 0 || o === i) continue;
           const other = this.items[o];
           if ((it.fragile && other.weight >= HEAVY) || (it.weight >= HEAVY && other.fragile)) {
@@ -994,17 +1081,31 @@ export class Play {
       const shake = fx.shake ? Math.sin(this.t * 60) * 4 * fx.shake : 0;
       const hot = this.drag?.snap?.box === b ? 1 : 0;
       drawBoxBase(ctx, g, C, { warn: over.includes(b) ? 1 : 0, glow: hot, shake });
+      if (layersOf(this.boxes[b]) > 1 && !this.celebration) this.drawLayerMark(g);
     });
 
-    // packed items, with their footprints
-    const packed = [...this.board.place.keys()].sort((a, b) => this.vis[a].ty - this.vis[b].ty);
-    for (const i of packed) this.drawFootprint(i);
-    for (const i of packed) this.drawItem(i);
+    // packed items, bottom layer first; things on top sit a little higher
+    const packed = [...this.board.place.keys()].sort(
+      (a, b) => (this.vis[a].layer || 0) - (this.vis[b].layer || 0) || this.vis[a].ty - this.vis[b].ty,
+    );
+    for (const l of [0, 1]) {
+      const here = packed.filter((i) => (this.vis[i].layer || 0) === l);
+      if (l === 1) for (const i of here) this.drawStackShadow(i);
+      for (const i of here) this.drawFootprint(i);
+      for (const i of here) this.drawItem(i);
+    }
 
-    // fragile cracks
+    // fragile problems: cracks along shared edges, and crushes
     for (const c of cracks) {
       const g = this.geo[c.box];
-      const x0 = g.x + (c.x + c.dx) * C, y0 = g.y + (c.y + c.dy) * C;
+      const lz = c.layer ? -this.stackLift() : 0;
+      if (c.kind === "crush") {
+        const X = g.x + c.x * C, Y = g.y + c.y * C + lz;
+        drawCrack(ctx, X + 4, Y + 4, X + C - 4, Y + C - 4, this.t);
+        drawCrack(ctx, X + C - 4, Y + 4, X + 4, Y + C - 4, this.t);
+        continue;
+      }
+      const x0 = g.x + (c.x + c.dx) * C, y0 = g.y + (c.y + c.dy) * C + lz;
       if (c.dx) drawCrack(ctx, x0, y0 + 4, x0, y0 + C - 4, this.t);
       else drawCrack(ctx, x0 + 4, y0, x0 + C - 4, y0, this.t);
     }
@@ -1040,8 +1141,9 @@ export class Play {
       }
     }
 
-    // floor items
+    // floor items, and anything on its way to the donation pile
     for (const i of this.drawOrderTray()) this.drawItem(i, true);
+    this.vis.forEach((v, i) => { if (v.where === "donated" && v.alpha > 0) this.drawItem(i, true); });
 
     // walking cat
     if (this.cat && !(this.cat.napping || (this.cat.state === "hop" && this.cat.hop.next === "settle"))) this.cat.draw(ctx);
@@ -1062,17 +1164,55 @@ export class Play {
     this.drawParticles();
   }
 
+  /** How far a top-layer item is drawn above its cells. */
+  stackLift() {
+    return Math.round(this.C * 0.12);
+  }
+
+  liftOf(i) {
+    const v = this.vis[i];
+    return v.where === "box" && v.layer === 1 ? this.stackLift() : 0;
+  }
+
+  drawStackShadow(i) {
+    const { ctx } = this;
+    const v = this.vis[i];
+    const sh = rotations(this.items[i].shape)[v.rot];
+    ctx.fillStyle = "rgba(30,14,4,0.30)";
+    for (const [x, y] of sh.cells) ctx.fillRect(v.x + x * v.s + 3, v.y + y * v.s + 4, v.s, v.s);
+  }
+
+  /** Little "2 LAYERS" tag on the back flap of a stackable box. */
+  drawLayerMark(g) {
+    const { ctx, C } = this;
+    const fs = Math.max(9, Math.round(C * 0.2));
+    const x = g.x + g.w * C - fs * 0.4, y = g.y - this.flap.top * 0.55;
+    ctx.save();
+    ctx.font = `700 ${fs}px ${FONT_UI}`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    const label = "2 LAYERS";
+    const tw = ctx.measureText(label).width;
+    const u = fs * 0.45;
+    ctx.fillStyle = "rgba(60,32,10,0.75)";
+    ctx.fillRect(x - tw - u * 3.2, y - u * 0.9, u * 1.6, u * 1.1);
+    ctx.fillRect(x - tw - u * 2.6, y - u * 0.2, u * 1.6, u * 1.1);
+    ctx.fillText(label, x, y + 1);
+    ctx.restore();
+  }
+
   drawFootprint(i) {
     const { ctx } = this;
     const v = this.vis[i];
     const sh = rotations(this.items[i].shape)[v.rot];
     const s = v.s;
+    const lz = this.liftOf(i);
     const set = new Set(sh.cells.map(([x, y]) => x + "," + y));
-    ctx.fillStyle = "rgba(255,238,205,0.13)";
-    for (const [x, y] of sh.cells) ctx.fillRect(v.x + x * s + 1, v.y + y * s + 1, s - 2, s - 2);
+    ctx.fillStyle = lz ? "rgba(255,238,205,0.22)" : "rgba(255,238,205,0.13)";
+    for (const [x, y] of sh.cells) ctx.fillRect(v.x + x * s + 1, v.y + y * s + 1 - lz, s - 2, s - 2);
     ctx.fillStyle = "rgba(70,38,12,0.30)";
     for (const [x, y] of sh.cells) {
-      const X = v.x + x * s, Y = v.y + y * s;
+      const X = v.x + x * s, Y = v.y + y * s - lz;
       if (!set.has(`${x},${y - 1}`)) ctx.fillRect(X, Y, s, 2);
       if (!set.has(`${x},${y + 1}`)) ctx.fillRect(X, Y + s - 2, s, 2);
       if (!set.has(`${x - 1},${y}`)) ctx.fillRect(X, Y, 2, s);
@@ -1090,7 +1230,7 @@ export class Play {
     const base = it.shape;
     const s = v.s;
     const w = sh.w * s, h = sh.h * s;
-    const cx = v.x + w / 2, cy = v.y + h / 2;
+    const cx = v.x + w / 2, cy = v.y + h / 2 - this.liftOf(i);
 
     // shadows
     if (held) {
@@ -1117,6 +1257,14 @@ export class Play {
     ctx.drawImage(img, bx, by, bw, bh, (-bw * k) / 2, (-bh * k) / 2, bw * k, bh * k);
     ctx.restore();
 
+    // what it's worth, in keep-or-let-go rooms
+    if (this.keep && v.where !== "donated" && !(this.done && v.where === "box")) {
+      const val = valueOf(it);
+      const u = Math.max(1.5, s * 0.06);
+      const hx = cx - ((val - 1) * u * 9) / 2, hy = v.y + h - u * 5 - this.liftOf(i);
+      for (let k = 0; k < val; k++) drawHeart(ctx, hx + k * u * 9, hy, u, "rgba(232,92,120,0.95)");
+    }
+
     // rule badges
     if (this.done && v.where === "box") return;
     const badge = Math.max(15, Math.round(s * 0.4));
@@ -1126,7 +1274,8 @@ export class Play {
 
   drawGhost(i, snap) {
     const { ctx, C } = this;
-    const g = this.geo[snap.box];
+    const g0 = this.geo[snap.box];
+    const g = snap.layer ? { ...g0, y: g0.y - this.stackLift() } : g0;
     const sh = rotations(this.items[i].shape)[this.vis[i].rot];
     const warn = snap.ok && snap.soft?.any;
     ctx.fillStyle = !snap.ok ? "rgba(220,70,55,0.34)" : warn ? "rgba(235,160,50,0.40)" : "rgba(130,210,120,0.40)";
@@ -1146,6 +1295,17 @@ export class Play {
       if (!set.has(`${cx},${cy + 1}`)) ctx.fillRect(X, Y + C - 2, C, 2);
       if (!set.has(`${cx - 1},${cy}`)) ctx.fillRect(X, Y, 2, C);
       if (!set.has(`${cx + 1},${cy}`)) ctx.fillRect(X + C - 2, Y, 2, C);
+    }
+    if (snap.ok && snap.layer) {
+      const fs = Math.max(11, Math.round(C * 0.26));
+      const [cx0, cy0] = sh.cells[0];
+      ctx.font = `700 ${fs}px ${FONT_UI}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = "rgba(20,10,4,0.6)";
+      ctx.fillText("on top", g.x + (snap.x + cx0) * C + 3, g.y + (snap.y + cy0) * C - 1);
+      ctx.fillStyle = "#fff6dc";
+      ctx.fillText("on top", g.x + (snap.x + cx0) * C + 2, g.y + (snap.y + cy0) * C - 2);
     }
     if (warn && snap.soft.touch.length) {
       for (const o of snap.soft.touch) {
@@ -1175,9 +1335,17 @@ export class Play {
     if (h.kind === "place") {
       const p = h.target;
       const g = this.geo[p.box];
+      const lz = p.layer ? this.stackLift() : 0;
       const ts = rotations(this.items[h.i].shape)[p.rot];
       ctx.fillStyle = `rgba(255,214,90,${0.25 + 0.2 * pulse})`;
-      for (const [x, y] of cellsAt(ts, p.x, p.y)) ctx.fillRect(g.x + x * C + 2, g.y + y * C + 2, C - 4, C - 4);
+      for (const [x, y] of cellsAt(ts, p.x, p.y)) ctx.fillRect(g.x + x * C + 2, g.y + y * C + 2 - lz, C - 4, C - 4);
+      if (p.layer) {
+        const [x, y] = cellsAt(ts, p.x, p.y)[0];
+        ctx.font = `700 ${Math.max(11, C * 0.26)}px ${FONT_UI}`;
+        ctx.fillStyle = "#fff4cf";
+        ctx.textAlign = "left";
+        ctx.fillText("on top", g.x + x * C + 2, g.y + y * C - lz - 3);
+      }
       if (p.rot !== v.rot) {
         ctx.font = `600 ${Math.max(12, C * 0.28)}px ${FONT_UI}`;
         ctx.fillStyle = "#fff4cf";

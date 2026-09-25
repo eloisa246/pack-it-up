@@ -16,6 +16,8 @@ const TEACH = {
   cat: { icon: "🐈", text: "Stretchy naps in any open space big enough for a cat. Tap him to shoo him out." },
   weight: { icon: "⚖", text: "Each box can only hold so much weight. Watch the meter under it." },
   fragile: { icon: "🍷", text: "Fragile things can't touch heavy things. Pad them with something light." },
+  layers: { icon: "⧉", text: "Deep boxes hold two layers. Stack things on a flat, even surface — and never heavy on fragile." },
+  keep: { icon: "♥", text: "It won't all fit. Pack what matters most (♥), then seal the boxes. The rest gets donated." },
 };
 
 const ROOM_NAMES = { bathroom: "Bathroom", kitchen: "Kitchen", bedroom: "Bedroom", living: "Living room", office: "Office", dining: "Dining room" };
@@ -294,7 +296,9 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
           <span className="hud-num">Room {index + 1}</span>
           <span className="hud-name">{level.title}</span>
           <span className="hud-sub">
-            {hud.placed}/{hud.total} packed{proGoal ? ` · pro: ${hud.par} boxes` : ""}
+            {hud.keep
+              ? `♥ ${hud.keep.value} of ${hud.keep.target} needed · best ${hud.keep.best}`
+              : `${hud.placed}/${hud.total} packed${proGoal ? ` · pro: ${hud.par} boxes` : ""}`}
           </span>
         </div>
         <div className="hud-actions">
@@ -304,6 +308,12 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
           <button className={`icon-btn ${settings.music ? "" : "off"}`} onClick={() => onToggle("music")} aria-label="Music">♪</button>
         </div>
       </header>
+
+      {hud.canSeal && !result && (
+        <button className="btn big seal-btn" onClick={() => playRef.current?.seal()}>
+          Seal the boxes ✓
+        </button>
+      )}
 
       {toast && (
         <div className={`toast ${toast.kind}`} role="status">
@@ -345,18 +355,38 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
             <span className="result-stamp">PACKED</span>
             <h2>{level.title}</h2>
             <dl className="stats">
-              <div>
-                <dt>Boxes</dt>
-                <dd>
-                  {result.boxes} of {result.total}
-                </dd>
-              </div>
+              {result.keep ? (
+                <div>
+                  <dt>Kept</dt>
+                  <dd>♥ {result.keep.value}</dd>
+                </div>
+              ) : (
+                <div>
+                  <dt>Boxes</dt>
+                  <dd>
+                    {result.boxes} of {result.total}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>Time</dt>
                 <dd>{fmtTime(result.ms)}</dd>
               </div>
             </dl>
-            {result.pro ? (
+            {result.keep ? (
+              <>
+                {result.keep.donated > 0 && (
+                  <p className="donated">
+                    {result.keep.donated} {result.keep.donated === 1 ? "thing" : "things"} went to the donation pile.
+                  </p>
+                )}
+                {result.pro ? (
+                  <p className="pro yes">★ Pro packer — the best haul there is.</p>
+                ) : (
+                  <p className="pro no">A pro could keep ♥ {result.keep.best}.</p>
+                )}
+              </>
+            ) : result.pro ? (
               <p className="pro yes">★ Pro packer — only {result.boxes} {result.boxes === 1 ? "box" : "boxes"}.</p>
             ) : result.par < result.total ? (
               <p className="pro no">A pro could fit this in {result.par}.</p>

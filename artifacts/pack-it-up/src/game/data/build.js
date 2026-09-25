@@ -19,6 +19,9 @@ export function levelItems(level) {
       weight: it.weight,
       fragile: fragileOn && !!it.fragile,
       memory: it.memory || null,
+      // keep-or-let-go: everything is optional and worth some hearts
+      optional: !!level.keep,
+      value: level.love?.[id] ?? it.love ?? (it.memory ? 3 : 1),
     };
   });
 }
