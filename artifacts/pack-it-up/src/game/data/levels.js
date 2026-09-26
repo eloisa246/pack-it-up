@@ -11,6 +11,7 @@
 //   mood    Stretchy wants attention: his mood drains, and when it runs out
 //           he acts out. Pet him or toss him a toy to keep him happy.
 //   boxes   w×h grid, optional maxWeight, optional layers (1 or 2), label
+//   music   the room's soundtrack (a key of TRACKS in audio.js)
 //   keep    keep-or-let-go: not everything fits. { target, best } in hearts;
 //           `love` overrides what each item is worth here.
 
@@ -20,6 +21,7 @@ const WF = ["weight", "fragile"];
 export const LEVELS = [
   {
     id: "medicine-cabinet",
+    music: "spaghetti",
     room: "bathroom",
     title: "The Medicine Cabinet",
     intro: "Start small. Everything on these shelves goes in one box.",
@@ -30,6 +32,7 @@ export const LEVELS = [
   },
   {
     id: "under-the-sink",
+    music: "dry",
     room: "bathroom",
     title: "Under the Sink",
     intro: "It's a shallow box. Some of this will have to lie down.",
@@ -40,6 +43,7 @@ export const LEVELS = [
   },
   {
     id: "pantry",
+    music: "oldies",
     room: "kitchen",
     title: "The Pantry",
     intro: "More food than you remember buying. More than one box this time.",
@@ -50,6 +54,7 @@ export const LEVELS = [
   },
   {
     id: "junk-drawer",
+    music: "eightbit",
     room: "kitchen",
     title: "The Junk Drawer",
     intro: "Every home has one. Two flashlights, and neither of them works.",
@@ -60,6 +65,7 @@ export const LEVELS = [
   },
   {
     id: "closet",
+    music: "rnb",
     room: "bedroom",
     title: "The Closet",
     intro: "Big soft things. Stretchy has noticed the boxes.",
@@ -70,6 +76,7 @@ export const LEVELS = [
   },
   {
     id: "sewing-tin",
+    music: "nighttrain",
     room: "bedroom",
     title: "The Sewing Tin",
     intro: "It all came out of this tin, so it all goes back in. Somehow.",
@@ -80,6 +87,7 @@ export const LEVELS = [
   },
   {
     id: "bookshelf",
+    music: "pop",
     room: "living",
     title: "The Bookshelf",
     intro: "Heavy things go in small boxes. Every mover says so.",
@@ -95,6 +103,7 @@ export const LEVELS = [
   },
   {
     id: "toolbox",
+    music: "synthwave",
     room: "hall",
     title: "The Toolbox",
     intro: "A deep box. Fill the bottom, then keep going.",
@@ -105,6 +114,7 @@ export const LEVELS = [
   },
   {
     id: "bags",
+    music: "spaghetti",
     room: "bedroom",
     title: "Bags & Small Things",
     intro: "Bags inside boxes. Small things in the gaps. Stretchy is feeling ignored.",
@@ -116,6 +126,7 @@ export const LEVELS = [
   },
   {
     id: "cookware",
+    music: "oldies",
     room: "kitchen",
     title: "Pots & Plates",
     intro: "Cast iron and china. Keep them apart, or something breaks.",
@@ -131,6 +142,7 @@ export const LEVELS = [
   },
   {
     id: "desk",
+    music: "eightbit",
     room: "office",
     title: "The Desk",
     intro: "Two deep boxes. Everything you stack still counts toward the weight.",
@@ -146,6 +158,7 @@ export const LEVELS = [
   },
   {
     id: "bar-cart",
+    music: "jazz",
     room: "dining",
     title: "The Bar Cart",
     intro: "Bottles are heavy. Glasses are not brave. Glass can ride on top — nothing heavy can.",
@@ -158,6 +171,7 @@ export const LEVELS = [
   },
   {
     id: "carry-on",
+    music: "pop",
     room: "hall",
     title: "The Carry-On",
     intro: "The first night's bag. It won't all fit — bring what you'll miss most.",
@@ -171,6 +185,7 @@ export const LEVELS = [
   },
   {
     id: "music",
+    music: "rnb",
     room: "living",
     title: "The Music Corner",
     intro: "The awkward stuff. There's no right way to box a guitar.",
@@ -186,6 +201,7 @@ export const LEVELS = [
   },
   {
     id: "keepsakes",
+    music: "nighttrain",
     room: "bedroom",
     title: "The Keepsake Shelf",
     intro: "One deep box for everything that matters. Take your time with this one.",
@@ -200,6 +216,7 @@ export const LEVELS = [
   },
   {
     id: "stretchy",
+    music: "cherry",
     room: "kitchen",
     title: "Stretchy's Things",
     intro: "Last room. His things. He is not going to make this easy.",

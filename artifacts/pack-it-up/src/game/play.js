@@ -362,7 +362,7 @@ export class Play {
 
   hitTest(x, y) {
     // napping cat sits on top of box contents
-    if (this.cat?.napping && this.cat.hit(x, y)) return { kind: "cat" };
+    if (this.cat?.inBox && this.cat.hit(x, y)) return { kind: "cat" };
     // packed items: exact cell lookup
     for (let b = 0; b < this.geo.length; b++) {
       const g = this.geo[b];
@@ -780,7 +780,57 @@ export class Play {
       unblock: (s) => this.setBlock(s, false),
       spawn: (k, x, y) => this.spawn(k, x, y),
       busy: () => !!this.drag || this.done,
+      // mood rooms
+      mood: !!this.level.mood,
+      dragging: () => (this.drag && !this.done ? { x: this.drag.px, y: this.drag.py } : null),
+      pounced: () => this.pounced(),
+      swatTarget: (x, y) => this.swatTarget(x, y),
+      stillSwattable: (i) => this.swattable(i),
+      knock: (i, dir) => this.knock(i, dir),
+      mischief: () => this.toastOnce("mischief", "Stretchy's had enough of being ignored. Tap him to pet him — or catch him in the act."),
     };
+  }
+
+  /** Packed, nothing on top, and not under a sleeping cat. */
+  swattable(i) {
+    const v = this.vis[i];
+    if (this.done || v.where !== "box" || itemsOnTop(this.board, i).length) return false;
+    return !this.cat?.spot || this.board.place.get(i).box !== this.cat.spot.box || !this.cellsHitCat(i, this.board.place.get(i));
+  }
+
+  /** Something he could knock out, preferring what's close. */
+  swatTarget(x, y) {
+    const cands = [...this.board.place.keys()].filter((i) => this.swattable(i)).map((i) => {
+      const v = this.vis[i], s = rotations(this.items[i].shape)[v.rot];
+      const px = v.tx + (s.w * this.C) / 2, py = v.ty + (s.h * this.C) / 2;
+      return { i, px, py, d: Math.hypot(px - x, py - y) + this.rng() * this.C * 4 };
+    });
+    cands.sort((a, b) => a.d - b.d);
+    return cands[0] || null;
+  }
+
+  /** The cat swatted item i out of its box, back onto the floor. */
+  knock(i, dir = 1) {
+    const v = this.vis[i];
+    lift(this.board, i);
+    v.where = "tray";
+    v.wob = 1;
+    v.tAng += dir * 360;
+    audio.bonk();
+    this.spawn("puff", v.x, v.y);
+    this.layoutTray();
+    this.toastOnce("knock", `Stretchy knocked the ${this.items[i].name.toLowerCase()} out. Keep him happy!`);
+    this.emitState();
+  }
+
+  /** He leapt at the thing in your hand: you drop it, and it goes back where it was. */
+  pounced() {
+    const d = this.drag;
+    if (!d) return;
+    d.snap = null;
+    this.drop();
+    this.vis[d.i].wob = 1;
+    this.toastOnce("pounce", "Pounced! Stretchy wants attention more than you want that.");
   }
 
   /**
@@ -861,6 +911,7 @@ export class Play {
     }
     if (kind === "z") Object.assign(p, { vx: 12, vy: -22, life: 2.2 });
     if (kind === "heart") Object.assign(p, { vx: (r() - 0.5) * 20, vy: -40, life: 1.3 });
+    if (kind === "bang") Object.assign(p, { vy: -14, life: 1.5 });
     if (kind === "spark") Object.assign(p, { vx: (r() - 0.5) * 40, vy: -30 - r() * 40, life: 0.9 + r() * 0.5 });
     if (kind === "peanut") Object.assign(p, { vx: (r() - 0.5) * 60, vy: 60 + r() * 120, life: 4, rot: r() * 6, vr: (r() - 0.5) * 8, hue: r() });
     this.particles.push(p);
@@ -929,6 +980,16 @@ export class Play {
     });
 
     this.cat?.update(dt);
+    if (this.cat?.moodOn) {
+      const m = Math.round(this.cat.mood * 40) / 40;
+      if (m !== this.moodShown) {
+        this.moodShown = m;
+        this.emit("mood", m);
+      }
+    } else if (this.moodShown != null) {
+      this.moodShown = null;
+      this.emit("mood", null);
+    }
 
     for (const p of this.particles) {
       p.t += dt;
@@ -1090,7 +1151,16 @@ export class Play {
     );
     for (const l of [0, 1]) {
       const here = packed.filter((i) => (this.vis[i].layer || 0) === l);
-      if (l === 1) for (const i of here) this.drawStackShadow(i);
+      if (l === 1) {
+        // what's underneath sinks into shade, so the top layer reads as on top
+        ctx.fillStyle = "rgba(40,20,6,0.26)";
+        this.geo.forEach((g, b) => {
+          if (layersOf(this.boxes[b]) < 2) return;
+          const grid = this.board.grids[b], A = g.w * g.h;
+          for (let k = 0; k < A; k++) if (grid[A + k] >= 0 && grid[k] >= 0) ctx.fillRect(g.x + (k % g.w) * C, g.y + ((k / g.w) | 0) * C, C, C);
+        });
+        for (const i of here) this.drawStackShadow(i);
+      }
       for (const i of here) this.drawFootprint(i);
       for (const i of here) this.drawItem(i);
     }
@@ -1111,7 +1181,7 @@ export class Play {
     }
 
     // napping cat sits in the box, above the contents
-    if (this.cat?.napping || (this.cat?.state === "hop" && this.cat.hop.next === "settle")) this.cat.draw(ctx);
+    if (this.cat?.inBox) this.cat.draw(ctx);
 
     // weight meters
     if (this.weightOn) {
@@ -1146,7 +1216,7 @@ export class Play {
     this.vis.forEach((v, i) => { if (v.where === "donated" && v.alpha > 0) this.drawItem(i, true); });
 
     // walking cat
-    if (this.cat && !(this.cat.napping || (this.cat.state === "hop" && this.cat.hop.next === "settle"))) this.cat.draw(ctx);
+    if (this.cat && !this.cat.inBox) this.cat.draw(ctx);
 
     // hints
     if (this.hintFx) this.drawHint();
@@ -1407,6 +1477,29 @@ export class Play {
         ctx.fillText("z", p.x + Math.sin(p.t * 3) * 4, p.y);
       } else if (p.kind === "heart") {
         drawHeart(ctx, p.x, p.y, 3, `rgba(232,92,120,${a})`);
+      } else if (p.kind === "bang") {
+        // a little speech bubble with a "!"
+        const pop = Math.min(1, p.t * 6);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, a * 2);
+        ctx.translate(p.x, p.y);
+        ctx.scale(pop, pop);
+        ctx.fillStyle = "#fffaf0";
+        ctx.strokeStyle = "#2b1d14";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 11, 10, 0, 0, Math.PI * 2);
+        ctx.moveTo(-3, 9);
+        ctx.lineTo(-6, 16);
+        ctx.lineTo(3, 9);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#b3362b";
+        ctx.font = `700 14px ${FONT_UI}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("!", 0, 1);
+        ctx.restore();
       } else if (p.kind === "spark") {
         const s = 3 + Math.sin(k * Math.PI) * 3;
         ctx.fillStyle = `rgba(255,232,150,${a})`;

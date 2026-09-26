@@ -176,3 +176,13 @@ test("tutorials teach what they say", () => {
 test("level ids are unique", () => {
   assert.equal(new Set(LEVELS.map((l) => l.id)).size, LEVELS.length);
 });
+
+test("the daily box is the same for everyone, and always packable", async () => {
+  const { dailyLevel } = await import("../src/game/daily.js");
+  for (const key of ["2026-01-01", "2026-06-15", "2026-12-31"]) {
+    const a = dailyLevel(key), b = dailyLevel(key);
+    assert.ok(a, `${key}: no room`);
+    assert.deepEqual(a, b, `${key}: not deterministic`);
+    assert.equal(solveAny(levelBoxes(a), levelItems(a), { maxNodes: 2e6 }).status, "solved", `${key}: unsolvable`);
+  }
+});

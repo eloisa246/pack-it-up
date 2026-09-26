@@ -21,10 +21,21 @@ const SAMPLES = {
   plead2: "sfx/cat/stretchy_desperate_meow_03.mp3",
 };
 
+// Every track is loudness-normalized to -14 LUFS (two-pass EBU R128), so
+// switching rooms never jumps in volume. Re-normalize any track you add.
 export const TRACKS = {
-  title: "music/main_cherry_blossom.mp3",
-  play: ["music/library_spaghetti_on_the_island.mp3", "music/library_dry.mp3", "music/library_the_night_train.mp3"],
+  cherry: "music/main_cherry_blossom.mp3",
+  spaghetti: "music/library_spaghetti_on_the_island.mp3",
+  dry: "music/library_dry.mp3",
+  nighttrain: "music/library_the_night_train.mp3",
+  oldies: "music/radio_oldies_a_wink_behind_the_curtain.mp3",
+  eightbit: "music/radio_eight_bit_guru_meditation.mp3",
+  rnb: "music/radio_rnb_no_hero_of_mine.mp3",
+  pop: "music/radio_pop_some_kind_of_beautiful.mp3",
+  synthwave: "music/radio_synthwave_a_heart_made_of_pixels.mp3",
+  jazz: "music/radio_jazz_the_nightingale_is_singing_our_song.mp3",
 };
+TRACKS.title = TRACKS.cherry;
 
 class Audio {
   constructor() {

@@ -4,9 +4,10 @@ import { Play } from "./play.js";
 import { loadSprites, loadCatSheet, loadSplash } from "./assets.js";
 import { levelItems } from "./data/build.js";
 import { audio, TRACKS } from "./audio.js";
-import { loadSave, writeSave, recordLevel } from "./save.js";
+import { loadSave, writeSave, recordLevel, recordDaily, dailyStreak } from "./save.js";
+import { dailyLevel, todayKey } from "./daily.js";
 import { Ending } from "./Ending.jsx";
-import { CAT_ANIM, drawCatFrame } from "./cat.js";
+import { CAT_ANIM, MOOD_LOW, drawCatFrame } from "./cat.js";
 
 const TEACH = {
   drag: { icon: "✋", text: "Drag things into the box. Everything has to fit." },
@@ -14,13 +15,23 @@ const TEACH = {
   boxes: { icon: "▦", text: "More than one box. Use whichever you like." },
   par: { icon: "★", text: "There's a spare box. Pros won't need it — can you fit it all in two?" },
   cat: { icon: "🐈", text: "Stretchy naps in any open space big enough for a cat. Tap him to shoo him out." },
+  tight: { icon: "▣", text: "No wiggle room: every single square gets filled. Work out where the odd shapes go first." },
   weight: { icon: "⚖", text: "Each box can only hold so much weight. Watch the meter under it." },
+  layers: { icon: "⧉", text: "Deep boxes hold two layers. Stack on a flat, even surface — then keep packing on top." },
+  mood: { icon: "♡", text: "Stretchy wants attention. Watch his mood — pet him or toss him a toy before it runs out, or he'll make trouble." },
   fragile: { icon: "🍷", text: "Fragile things can't touch heavy things. Pad them with something light." },
-  layers: { icon: "⧉", text: "Deep boxes hold two layers. Stack things on a flat, even surface — and never heavy on fragile." },
+  stackweight: { icon: "⚖", text: "Stacking saves space, not weight. Both layers count toward a box's limit." },
+  crush: { icon: "⧉", text: "Glass can ride on top of a bottle. A bottle can't ride on glass." },
   keep: { icon: "♥", text: "It won't all fit. Pack what matters most (♥), then seal the boxes. The rest gets donated." },
+  awkward: { icon: "🎸", text: "Big, awkward shapes. Place those first — the small things will find a gap." },
+  keepsakes: { icon: "♥", text: "Choose what to keep, with every rule in play. The best haul is hard to find." },
+  finale: { icon: "🐾", text: "Everything at once — and Stretchy at his worst. Keep him happy." },
 };
 
-const ROOM_NAMES = { bathroom: "Bathroom", kitchen: "Kitchen", bedroom: "Bedroom", living: "Living room", office: "Office", dining: "Dining room" };
+// the daily box mixes every rule, so it opens once they've all been introduced
+const DAILY_AFTER = "cookware";
+
+const ROOM_NAMES = { bathroom: "Bathroom", kitchen: "Kitchen", bedroom: "Bedroom", living: "Living room", office: "Office", dining: "Dining room", hall: "Hallway" };
 
 export default function App() {
   const [save, setSave] = useState(() => {
@@ -64,6 +75,21 @@ export default function App() {
         onToggle={toggle}
         onPlay={() => go("play", { index: nextIndex === -1 ? 0 : nextIndex })}
         onRooms={() => go("rooms")}
+        daily={{ open: !!save.levels[DAILY_AFTER]?.done, done: !!save.daily?.[todayKey()]?.done, streak: dailyStreak(save) }}
+        onDaily={() => go("daily", { key: todayKey() })}
+      />
+    );
+  if (screen.name === "daily")
+    return (
+      <DailyScreen
+        key={`${screen.key}-${screen.nonce || 0}`}
+        dateKey={screen.key}
+        save={save}
+        settings={save.settings}
+        onToggle={toggle}
+        onSolved={(stats) => setSave((s) => recordDaily(s, screen.key, stats))}
+        onBack={() => go("title")}
+        onReplay={() => go("daily", { key: screen.key, nonce: (screen.nonce || 0) + 1 })}
       />
     );
   if (screen.name === "rooms")
@@ -73,7 +99,10 @@ export default function App() {
   return (
     <PlayScreen
       key={`${screen.index}-${screen.nonce || 0}`}
-      index={screen.index}
+      level={LEVELS[screen.index]}
+      num={`Room ${screen.index + 1}`}
+      kicker={`Room ${screen.index + 1} of ${LEVELS.length} · ${ROOM_NAMES[LEVELS[screen.index].room]}`}
+      nextLabel={screen.index === LEVELS.length - 1 ? "Moving day →" : "Next room →"}
       save={save}
       settings={save.settings}
       onToggle={toggle}
@@ -87,7 +116,7 @@ export default function App() {
 
 // ── title ────────────────────────────────────────────────────────────────────
 
-function Title({ started, finished, settings, onToggle, onPlay, onRooms }) {
+function Title({ started, finished, settings, onToggle, onPlay, onRooms, daily, onDaily }) {
   const logoRef = useRef(null);
   const catRef = useRef(null);
 
@@ -161,6 +190,12 @@ function Title({ started, finished, settings, onToggle, onPlay, onRooms }) {
               Rooms
             </button>
           )}
+          {started && daily.open && (
+            <button className="btn daily-btn" onClick={onDaily}>
+              {daily.done ? "✓ " : ""}Daily box
+              {daily.streak > 1 && <span className="streak">🔥 {daily.streak}</span>}
+            </button>
+          )}
         </div>
         <div className="toggles">
           <button className={`chip ${settings.music ? "on" : ""}`} onClick={() => onToggle("music")}>♪ Music</button>
@@ -211,8 +246,36 @@ function Rooms({ save, onPick, onBack, onEnding }) {
 
 // ── play ─────────────────────────────────────────────────────────────────────
 
-function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext, onReplay }) {
-  const level = LEVELS[index];
+/** The daily box: generated from the date (takes a moment, so it's built after first paint). */
+function DailyScreen({ dateKey, onBack, ...rest }) {
+  const [level, setLevel] = useState(null);
+  useEffect(() => {
+    const t = setTimeout(() => setLevel(dailyLevel(dateKey) || false), 30);
+    return () => clearTimeout(t);
+  }, [dateKey]);
+  if (!level)
+    return (
+      <div className="screen rooms">
+        <p className="loading">{level === false ? "No box today. Try again tomorrow!" : "Taping up today's box…"}</p>
+        {level === false && <button className="btn" onClick={onBack}>Back</button>}
+      </div>
+    );
+  const d = new Date(dateKey + "T12:00:00");
+  const when = d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  return (
+    <PlayScreen
+      level={level}
+      num="Daily box"
+      kicker={`Daily box · ${when}`}
+      nextLabel="Done"
+      onRooms={onBack}
+      onNext={onBack}
+      {...rest}
+    />
+  );
+}
+
+function PlayScreen({ level, num, kicker, nextLabel, save, settings, onToggle, onSolved, onRooms, onNext, onReplay }) {
   const canvasRef = useRef(null);
   const playRef = useRef(null);
   const [hud, setHud] = useState({ canUndo: false, placed: 0, total: 0, used: 0, boxes: level.boxes.length, par: level.boxes.length });
@@ -221,6 +284,7 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
   const [toast, setToast] = useState(null);
   const [memory, setMemory] = useState(null);
   const [result, setResult] = useState(null);
+  const [mood, setMood] = useState(null);
   const toastTimer = useRef(0);
   const memTimer = useRef(0);
 
@@ -231,7 +295,7 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
   }, []);
 
   useEffect(() => {
-    audio.setMusic(TRACKS.play[index % TRACKS.play.length]);
+    audio.setMusic(TRACKS[level.music] || TRACKS.spaghetti);
     let alive = true;
     const files = levelItems(level).map((it) => it.file);
     Promise.all([loadSprites(files), loadCatSheet(), loadFonts()]).then(([sprites, catSheet]) => {
@@ -242,6 +306,7 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
         onEvent: (type, data) => {
           if (type === "state") setHud(data);
           else if (type === "toast") showToast(data);
+          else if (type === "mood") setMood(data);
           else if (type === "memory") {
             setToast(null);
             setMemory(data);
@@ -282,22 +347,21 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
     playRef.current.begin();
   };
 
-  const teach = level.teach && TEACH[level.teach];
+  const teach = level.note ? { icon: "📦", text: level.note } : level.teach && TEACH[level.teach];
   const proGoal = hud.par < hud.boxes;
-  const last = index === LEVELS.length - 1;
 
   return (
-    <div className="screen play">
+    <div className={`screen play ${mood != null && !result ? "with-mood" : ""}`}>
       <canvas ref={canvasRef} className="play-canvas" />
 
       <header className="hud">
         <button className="icon-btn" onClick={onRooms} aria-label="Rooms">☰</button>
         <div className="hud-title">
-          <span className="hud-num">Room {index + 1}</span>
+          <span className="hud-num">{num}</span>
           <span className="hud-name">{level.title}</span>
           <span className="hud-sub">
             {hud.keep
-              ? `♥ ${hud.keep.value} of ${hud.keep.target} needed · best ${hud.keep.best}`
+              ? `♥ ${hud.keep.value} of ${hud.keep.target} · best ${hud.keep.best}`
               : `${hud.placed}/${hud.total} packed${proGoal ? ` · pro: ${hud.par} boxes` : ""}`}
           </span>
         </div>
@@ -308,6 +372,15 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
           <button className={`icon-btn ${settings.music ? "" : "off"}`} onClick={() => onToggle("music")} aria-label="Music">♪</button>
         </div>
       </header>
+
+      {mood != null && !result && (
+        <div className={`mood ${mood < MOOD_LOW ? "low" : ""}`} aria-label={`Stretchy's mood ${Math.round(mood * 100)}%`}>
+          <span className="mood-face">{mood >= 0.6 ? "😺" : mood >= MOOD_LOW ? "🐱" : "😾"}</span>
+          <span className="mood-bar">
+            <span style={{ width: `${Math.round(mood * 100)}%` }} />
+          </span>
+        </div>
+      )}
 
       {hud.canSeal && !result && (
         <button className="btn big seal-btn" onClick={() => playRef.current?.seal()}>
@@ -331,9 +404,7 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
       {intro && (
         <div className="overlay" onClick={begin}>
           <div className="card intro-card">
-            <span className="card-kicker">
-              Room {index + 1} of {LEVELS.length} · {ROOM_NAMES[level.room]}
-            </span>
+            <span className="card-kicker">{kicker}</span>
             <h2>{level.title}</h2>
             <p className="intro-text">{level.intro}</p>
             {teach && (
@@ -393,7 +464,7 @@ function PlayScreen({ index, save, settings, onToggle, onSolved, onRooms, onNext
             ) : null}
             <div className="result-buttons">
               <button className="btn" onClick={onReplay}>Replay</button>
-              <button className="btn big" onClick={onNext}>{last ? "Moving day →" : "Next room →"}</button>
+              <button className="btn big" onClick={onNext}>{nextLabel}</button>
             </div>
           </div>
         </div>

@@ -3,6 +3,12 @@
 // it — climbs into any open 3×2 space in a box and falls asleep there, which
 // blocks those cells until you tap him out.
 //
+// In rooms with `mood`, he also wants attention. His mood drains; napping
+// tops it up a little, a pet tops it up a lot. Low, he stands up and begs.
+// Empty, he acts out: pounces on whatever you're carrying, jumps into a box
+// and swats something back onto the floor, or gets the zoomies. Tap him
+// mid-mischief to stop him.
+//
 // Scale: his sleeping loaf (23px of art) fills a 3×2 nap spot, so he's a
 // little smaller than a bag of kibble and far bigger than his bowls. Away
 // from the boxes he's drawn smaller, matching the floor's perspective.
@@ -22,6 +28,9 @@ export const CAT_ANIM = {
   land:    { row: 20, n: 4, fps: 12, once: true },
   happy:   { row: 28, n: 4, fps: 5 },
   look:    { row: 25, n: 4, fps: 5, once: true },
+  swat:    { row: 42, n: 4, fps: 9, once: true },
+  pounce:  { row: 46, n: 8, fps: 16, once: true },
+  beg:     { row: 48, n: 8, fps: 8 },
 };
 
 /**
@@ -77,9 +86,13 @@ export function drawCatFrame(ctx, sheet, anim, frame, S) {
 
 const MODES = {
   // [first nap after (s), cooldown between naps (s), nap length (s)]
-  boxes: { first: [9, 14], cool: [16, 26], nap: [22, 34] },
-  chaos: { first: [3, 5], cool: [5, 9], nap: [60, 90] },
+  // drain: seconds for a full mood to run out
+  boxes: { first: [9, 14], cool: [16, 26], nap: [22, 34], drain: 42 },
+  chaos: { first: [3, 5], cool: [5, 9], nap: [60, 90], drain: 30 },
 };
+
+export const MOOD_LOW = 0.3;
+const PET = 0.45;
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -113,6 +126,12 @@ export class Cat {
     this.hop = null;
     this.zT = 0;
     this.speed = 70;
+    // mood (rooms with `mood` only)
+    this.moodOn = !!world.mood;
+    this.mood = 1;
+    this.drain = (MODES[mode] || MODES.boxes).drain;
+    this.begIn = 2;
+    this.mischief = null;
   }
 
   setScale(C) {
@@ -123,7 +142,13 @@ export class Cat {
 
   /** Perspective: smaller near the wall, full size by the boxes. */
   get depth() {
-    return this.napping || (this.state === "hop" && this.hop?.next === "settle") ? 1 : this.world.depth(this.y);
+    return this.inBox ? 1 : this.world.depth(this.y);
+  }
+
+  /** Up in a box (napping, or hopping in to nap or make trouble). */
+  get inBox() {
+    return this.napping || this.state === "swat" ||
+      (this.state === "hop" && ["settle", "swat"].includes(this.hop?.next));
   }
 
   play(anim) {
@@ -154,6 +179,7 @@ export class Cat {
     this.S = this.base * this.depth;
     this.speed = 26 * this.S;
     if (this.mode && MODES[this.mode] && !this.spot && this.state !== "hop") this.napIn -= dt;
+    if (this.moodOn) this.updateMood(dt);
 
     switch (this.state) {
       case "enter":
@@ -195,7 +221,17 @@ export class Cat {
             this.world.spawn("puff", this.x, this.y);
             this.state = this.hop.next;
             if (this.state === "settle") this.play("lieDown");
-            else {
+            else if (this.state === "swat") {
+              this.play("swat");
+              audio.pick(["grumble1", "grumble3"], { vol: 0.6 });
+            } else if (this.state === "pounce") {
+              this.play("pounce");
+              this.world.pounced();
+            }
+            else if (this.state === "zoom") {
+              const fl = this.world.floor();
+              this.target = { x: rand(fl.x0 + 20, fl.x1 - 20), y: rand(fl.y0, fl.y1) };
+            } else {
               this.play("idle");
               this.timer = 0.4;
             }
@@ -223,6 +259,50 @@ export class Cat {
       case "happy":
         if (this.timer <= 0) this.wander();
         break;
+      case "beg":
+        if (this.timer <= 0) this.wander();
+        break;
+      case "toMischief":
+        if (!this.world.stillSwattable(this.mischief.i)) {
+          this.mischief = null;
+          this.zoomies();
+          break;
+        }
+        if (this.walkTo(this.approach, dt, 1.8)) {
+          const m = this.mischief;
+          this.startHop(m.px, m.py + this.S * 4, "swat");
+        }
+        break;
+      case "swat":
+        if (this.frame >= 2 && this.mischief && !this.mischief.hit) {
+          this.mischief.hit = true;
+          if (this.world.stillSwattable(this.mischief.i)) this.world.knock(this.mischief.i, this.facing);
+        }
+        if (this.animDone) {
+          const back = this.world.approach({ px: this.x, py: this.y });
+          this.mischief = null;
+          this.startHop(back.x, back.y, "zoom");
+          this.timer = 2.5;
+        }
+        break;
+      case "pounce":
+        if (this.animDone) {
+          const back = this.world.approach({ px: this.x, py: this.y });
+          this.startHop(back.x, back.y, "zoom");
+          this.timer = 2;
+        }
+        break;
+      case "zoom":
+        if (this.walkTo(this.target, dt, 3)) {
+          const fl = this.world.floor();
+          this.target = { x: rand(fl.x0 + 20, fl.x1 - 20), y: rand(fl.y0, fl.y1) };
+        }
+        if (this.timer <= 0) {
+          this.state = "rest";
+          this.play("groom");
+          this.timer = rand(2, 3.5);
+        }
+        break;
       case "flee":
         if (this.walkTo(this.target, dt, 2.2)) {
           this.state = "rest";
@@ -243,6 +323,58 @@ export class Cat {
     if (Math.abs(dx) > 2) this.facing = dx > 0 ? 1 : -1;
     this.play(speedMul > 1.5 ? "run" : "walk");
     return false;
+  }
+
+  updateMood(dt) {
+    if (this.napping) this.mood = Math.min(1, this.mood + dt / 60);
+    else if (this.state !== "happy") this.mood = Math.max(0, this.mood - dt / this.drain);
+    if (this.mood <= 0 && !this.mischief && this.calm) return this.actOut();
+    if (this.mood < MOOD_LOW && this.calm) {
+      this.begIn -= dt;
+      if (this.begIn <= 0) {
+        this.begIn = rand(4, 6);
+        this.state = "beg";
+        this.play("beg");
+        this.timer = 1.8;
+        audio.pick(["plead1", "plead2"], { vol: 0.55 });
+        this.world.spawn("bang", this.x, this.y - this.S * 26);
+      }
+    }
+  }
+
+  /** Walking about or sitting: free to start something new. */
+  get calm() {
+    return ["enter", "wander", "rest", "beg"].includes(this.state);
+  }
+
+  actOut() {
+    const drag = this.world.dragging();
+    this.mood = 0.4;
+    this.begIn = 3;
+    this.world.mischief();
+    if (drag) {
+      // leap at the thing you're holding
+      this.startHop(drag.x, drag.y + this.S * 6, "pounce");
+      this.hop.dur = 0.45;
+      audio.pick(["grumble2", "grumble4"], { vol: 0.7 });
+      return;
+    }
+    const t = this.world.swatTarget(this.x, this.y);
+    if (t) {
+      this.mischief = { ...t, hit: false };
+      this.approach = this.world.approach(t);
+      this.state = "toMischief";
+      return;
+    }
+    this.zoomies();
+  }
+
+  zoomies() {
+    const fl = this.world.floor();
+    this.state = "zoom";
+    this.timer = 3.5;
+    this.target = { x: rand(fl.x0 + 20, fl.x1 - 20), y: rand(fl.y0, fl.y1) };
+    audio.pick(["grumble1", "grumble2"], { vol: 0.6 });
   }
 
   wander() {
@@ -306,11 +438,19 @@ export class Cat {
   /** Tap on the cat. Returns true if it was handled. */
   tap() {
     if (this.state === "nap" || this.state === "settle") {
+      if (this.moodOn) this.mood = Math.max(0.05, this.mood - 0.1);
       this.world.spawn("puff", this.x, this.y - this.S * 8);
       this.wakeUp(true);
       return true;
     }
-    if (this.state === "hop" || this.state === "stretch" || this.state === "flee") return true;
+    // caught in the act: he gives up, a little sheepish
+    if (this.state === "toMischief" || this.state === "zoom") {
+      this.mischief = null;
+      this.mood = Math.min(1, this.mood + 0.2);
+      this.pet();
+      return true;
+    }
+    if (this.state === "hop" || this.state === "stretch" || this.state === "flee" || this.state === "swat" || this.state === "pounce") return true;
     // a pet — also distracts him from whatever box he was heading for
     if (this.spot) {
       this.world.unblock(this.spot);
@@ -318,12 +458,18 @@ export class Cat {
       const m = MODES[this.mode];
       if (m) this.napIn = rand(...m.cool);
     }
+    if (this.state !== "happy") this.mood = Math.min(1, this.mood + PET);
+    this.pet();
+    return true;
+  }
+
+  pet() {
     this.state = "happy";
     this.play("happy");
     this.timer = 2.4;
+    this.begIn = rand(3, 5);
     audio.pick(["happy1", "happy2", "happy3"], { vol: 0.6 });
     for (let i = 0; i < 3; i++) this.world.spawn("heart", this.x + (i - 1) * this.S * 5, this.y - this.S * 17 - i * 6);
-    return true;
   }
 
   /** Get out of whatever box you're in or headed for, right now. */
@@ -346,6 +492,10 @@ export class Cat {
     if (this.state === "hop") this.hop.next = "rest";
     this.mode = null;
     this.napIn = Infinity;
+    this.moodOn = false;
+    this.mischief = null;
+    if (["toMischief", "zoom", "beg"].includes(this.state)) this.wander();
+    if (this.state === "hop" && ["swat", "pounce"].includes(this.hop.next)) this.hop.next = "rest";
   }
 
   hit(px, py) {
@@ -356,7 +506,7 @@ export class Cat {
   draw(ctx) {
     const S = this.S;
     const a = CAT_ANIM[this.anim];
-    if (this.state !== "hop" && !this.napping) {
+    if (this.state !== "hop" && !this.inBox) {
       ctx.fillStyle = "rgba(30,15,5,0.22)";
       ctx.beginPath();
       ctx.ellipse(this.x, this.y + S, 10 * S, 2.4 * S, 0, 0, Math.PI * 2);

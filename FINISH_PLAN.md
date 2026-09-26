@@ -1,17 +1,17 @@
 # Pack It Up — Plan
 
-**State (2026-09-25):** rebuilt from the retired productivity app into a
-standalone packing puzzle. 13 rooms, all solver-verified, playable start to
-finish on phone and desktop. The plan-of-record for the old app lives in git
+**State (2026-09-26):** a standalone packing puzzle. 16 rooms (layers, keep
+rooms, Stretchy's mood), a daily box, a soundtrack per room. All
+solver-verified, playable start to finish on phone and desktop. The plan-of-record for the old app lives in git
 history (before commit "Rebuild Pack It Up as a packing puzzle").
 
 ## Next
 
-- [ ] **A human playtest.** Everything so far was verified by a solver, a
-      naive-player simulation, and a headless browser driving real input — none
-      of which has taste. Watch someone play rooms 1–7 cold. The Closet (room 5)
-      is the first real spike (4 solutions, naive player wins 1%); confirm it
-      reads as an "aha", not a wall.
+- [x] **A human playtest** (2026-09-25): "mostly easy, the last one
+      challenging, simple but sweet" → planner metric, new mechanics, retune.
+- [ ] **Playtest round two.** Does the new curve feel right? Is Stretchy's
+      mood fun pressure or a nag (drain rate lives in `MODES` in `cat.js`)?
+      Is the bookshelf (room 7, ~50%) too sharp a spike right after the tutorials?
 - [ ] **Real devices.** iOS Safari touch + audio unlock, Android Chrome, a
       small phone (≤ 360px wide). Only headless Chromium has been tested.
 - [ ] **Listen to it.** Mix levels for the synthesized effects (thud, tape,
@@ -21,11 +21,9 @@ history (before commit "Rebuild Pack It Up as a packing puzzle").
 
 ## Ideas
 
-- **Endless / daily room.** The pieces exist: pick items from a room theme,
-  solve, keep the set if `tools/naive.mjs` puts it in a target difficulty band.
 - **More rooms** from unused sprites: the garden (planters, bench, folding
-  chair), the toolbox (drill, hammer, pliers), the sewing kit, the carry-on
-  suitcase (a suitcase-shaped "box").
+  chair); a suitcase-shaped box for the carry-on.
+- **Toys for Stretchy:** drag one of his toys to him instead of petting.
 - **Bubble wrap:** wrap a fragile item to make it safe, at the cost of a
   one-cell border.
 - **Photo mode** on the result card — the sealed boxes, the cat on top.

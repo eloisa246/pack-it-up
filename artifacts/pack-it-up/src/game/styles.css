@@ -223,6 +223,29 @@ button { font-family: inherit; }
   z-index: 5;
   pointer-events: none; /* never block a drag */
 }
+.mood {
+  position: absolute;
+  right: 10px;
+  top: calc(env(safe-area-inset-top) + 58px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 5px;
+  border-radius: 999px;
+  background: rgba(251, 243, 226, 0.92);
+  border: 2px solid rgba(43, 29, 20, 0.85);
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 4;
+}
+.with-mood .toast, .with-mood .memory { top: calc(env(safe-area-inset-top) + 100px); }
+.mood-face { font-size: 18px; line-height: 1; }
+.mood-bar { width: 64px; height: 8px; border-radius: 4px; background: rgba(43, 29, 20, 0.18); overflow: hidden; }
+.mood-bar > span { display: block; height: 100%; background: #e85c78; transition: width 0.3s linear; }
+.mood.low { animation: mood-nag 0.9s ease-in-out infinite; border-color: var(--stamp); }
+.mood.low .mood-bar > span { background: var(--stamp); }
+@keyframes mood-nag { 50% { transform: translateY(-2px) rotate(-2deg); } }
+
 .seal-btn {
   position: absolute;
   left: 50%;
@@ -386,3 +409,10 @@ button { font-family: inherit; }
 .credits h1 { margin: 0; font-size: 44px; color: var(--gold); text-shadow: 0 3px 0 var(--ink); }
 .credits p { margin: 0; font-size: 18px; }
 .credits .dedication { font-family: var(--hand); font-size: 26px; opacity: 0.85; margin: 6px 0 14px; }
+
+/* ── daily ───────────────────────────────────────────────────────────────── */
+
+.daily-btn { display: inline-flex; align-items: center; gap: 8px; }
+.streak { font-size: 14px; background: var(--paper-2); border-radius: 999px; padding: 1px 7px; }
+.loading { color: var(--paper); text-align: center; margin-top: 40vh; font-size: 18px; }
+.rooms .loading + .btn { display: block; margin: 16px auto; }

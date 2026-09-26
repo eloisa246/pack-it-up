@@ -9,6 +9,17 @@ Covers **July 5–10, 2026**. Combines:
 
 ---
 
+## 2026-09-26 — [Claude Code / Opus 5.5]
+- **Playtest feedback** (Eloisa): "most of the levels were easy but the last one was challenging. a bit simple but sweet"; Stretchy got repetitive; wants each level to introduce one new thing, each level its own soundtrack, volume-balanced
+- **Difficulty metric replaced:** `src/game/planner.js`, a simulated player that packs like a person, calibrated against the playtest (old rooms 1–12 → 86–100%, finale → 30%). The naive player is gone
+- **Two-layer boxes:** stacking needs a level surface underneath; heavy-on-fragile crushes; covered items can't be moved until what's on top comes off
+- **Keep-or-let-go rooms:** more than fits; items worth hearts; reach the target and seal, the rest is donated; the best possible haul earns Pro (`bestHaul`, branch and bound)
+- **Stretchy's mood:** drains; pet him or he begs, then pounces on what you're holding, swats things out of boxes, or gets the zoomies. Uses the swat/pounce/beg rows of the sheet. HUD mood meter
+- **Campaign: 16 rooms**, one new idea each (sewing tin = no wiggle room, toolbox = layers, bags = mood, desk = stacked weight, bar cart = crush, carry-on = keep, keepsakes = keep with every rule). Tuned with the planner to a sawtooth curve ending at 30%
+- **Daily box:** generated from the date, solver-checked, planner-tuned to 25–75%; streak on the title screen; opens after Pots & Plates
+- **Music:** every room has a track (all 10 used, the main theme returns for the finale); all tracks two-pass loudness-normalized to −14 LUFS and re-encoded at 128 kbps (57 MB → 28 MB)
+- Verified: 29 tests; `check-levels`; `difficulty`; headless bot plays all 16 rooms + the daily box through real mouse input with no errors; mischief (swat, pounce, zoomies) exercised in the browser
+
 ## 2026-09-25 — [Claude Code / Opus 5.5]
 - **Rebuilt Pack It Up as a game.** The move is done; the productivity app (task deck, scheduler, receptionist, agent ledger) is retired and removed from `src/`. New game lives in `artifacts/pack-it-up/src/game/`
 - **Core idea:** a spatial packing puzzle where every item's grid shape comes from its own sprite silhouette (`tools/derive.mjs`, PNG decoded at build time). 191 items catalogued with real-world sizes (1 cell ≈ 10 cm)
